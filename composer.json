@@ -1,0 +1,21 @@
+{
+  "name": "weclapp/api",
+  "description": "Setzt die Weclapp API als PHP Projekt um",
+  "minimum-stability": "stable",
+  "license": "proprietary",
+  "authors": [
+    {
+      "name": "Michael Tosch",
+      "email": "m.tosch@miralsoft.com",
+      "role" : "Softwareengineer"
+    }
+  ],
+  "autoload" : {
+    "psr-4" : {
+      "weclapp\\api\\" : "src"
+    }
+  },
+  "require": {
+    "php": ">=8.0.0"
+  }
+}
