@@ -1,6 +1,6 @@
 <?php
 
-namespace weclapp\api;
+namespace miralsoft\weclapp\api;
 
 class APICall
 {

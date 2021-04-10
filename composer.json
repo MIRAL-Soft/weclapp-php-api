@@ -1,6 +1,6 @@
 {
   "name": "miralsoft/weclapp-api",
-  "description": "Setzt die Weclapp API als PHP Projekt um",
+  "description": "The api functions from weclapp in php.",
   "minimum-stability": "stable",
   "license": "proprietary",
   "authors": [
@@ -12,7 +12,7 @@
   ],
   "autoload" : {
     "psr-4" : {
-      "weclapp\\api\\" : "src"
+      "miralsoft\\weclapp\\api\\" : "src"
     }
   },
   "require": {

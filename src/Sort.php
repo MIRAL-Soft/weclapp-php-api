@@ -1,7 +1,7 @@
 <?php
 
 
-namespace weclapp\api;
+namespace miralsoft\weclapp\api;
 
 
 abstract class Sort
