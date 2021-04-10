@@ -1,5 +1,5 @@
 {
-  "name": "weclapp/api",
+  "name": "miralsoft/weclapp-api",
   "description": "Setzt die Weclapp API als PHP Projekt um",
   "minimum-stability": "stable",
   "license": "proprietary",
