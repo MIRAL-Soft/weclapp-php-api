@@ -23,10 +23,10 @@ class SalesInvoice extends WeclappAPICall
      *
      * @param int $page The page
      * @param int $pageSize Pagesize
-     * @param string $sort Sort (@see weclapp\api\Sort)
+     * @param string $sort The field for sorting for (- sign as prefix for DESC sorting)
      * @return array The result
      */
-    public function get(int $page = 1, int $pageSize = 50, string $sort = Sort::DESC)
+    public function get(int $page = 1, int $pageSize = 50, string $sort = '')
     {
         $this->subFunction = '';
         $data = array('page' => $page, 'pageSize' => $pageSize, 'sort' => $sort);
