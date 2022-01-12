@@ -10,7 +10,8 @@ Config::$TOKEN = 'xxx';
 
 $customer = new Customer();
 
-$result = $customer->get(1, 100, 'customerNumber');
+//$result = $customer->get(1, 100, 'customerNumber');
+$result = $customer->getAll('customerNumber');
 
 if (is_array($result)) {
     echo 'Count results: ' . count($result);
