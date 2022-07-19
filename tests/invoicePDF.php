@@ -5,8 +5,7 @@ require_once '../vendor/autoload.php';
 use miralsoft\weclapp\api\SalesInvoice;
 use miralsoft\weclapp\api\Config;
 
-Config::$URI = 'https://XXX.weclapp.com/webapp/api/v1/';
-Config::$TOKEN = 'XXX';
+require_once 'configWeclapp.php';
 
 
 $invoice = new SalesInvoice();

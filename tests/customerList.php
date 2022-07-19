@@ -5,8 +5,7 @@ require_once '../vendor/autoload.php';
 use miralsoft\weclapp\api\Customer;
 use miralsoft\weclapp\api\Config;
 
-Config::$URI = 'https://xxx.weclapp.com/webapp/api/v1/';
-Config::$TOKEN = 'xxx';
+require_once 'configWeclapp.php';
 
 $customer = new Customer();
 
