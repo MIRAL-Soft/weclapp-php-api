@@ -69,18 +69,19 @@ class Article extends WeclappAPICall
      * Gets all articles from the given category
      *
      * @param string $category the category
+     * @param string $sort sorting the article
      * @return array the article within the category
      */
-    public function getArticlesFromCategory(string $category): array
+    public function getArticlesFromCategory(string $category, string $sort = 'articleNumber'): array
     {
         $articlesInCategory = [];
 
         // increment all articles
-        $allArticles = $this->getAll('articleNumber');
+        $allArticles = $this->getAll($sort);
         if (is_array($allArticles) && count($allArticles) > 0) {
-            foreach($allArticles as $article){
+            foreach ($allArticles as $article) {
                 // If the article is in category
-                if(isset($article['articleCategoryId']) && $article['articleCategoryId'] == $category){
+                if (isset($article['articleCategoryId']) && $article['articleCategoryId'] == $category) {
                     $articlesInCategory[] = $article;
                 }
             }
