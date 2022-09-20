@@ -9,8 +9,9 @@ require_once 'configWeclapp.php';
 
 $customer = new Customer();
 
-//$result = $customer->get(1, 100, 'customerNumber');
-$result = $customer->getAll('customerNumber');
+//$result = $customer->get(1, 1, 'customerNumber');
+$result = $customer->get(1, 1, '-lastModifiedDate');
+//$result = $customer->getAll('customerNumber');
 
 if (is_array($result)) {
     echo 'Count results: ' . count($result);
