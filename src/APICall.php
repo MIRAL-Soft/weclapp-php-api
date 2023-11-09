@@ -34,6 +34,11 @@ class APICall
     protected static function prepareCall($function, array $data = array(), $post = false)
     {
         $url = Config::$URI . $function . (!$post && count($data) > 0 ? ('?' . http_build_query($data)) : '');
+
+        if(!Util::isSiteAvailable($url)){
+            throw new \DomainException('The url (' . $url . ') is not available! Please check the connection.');
+        }
+
         self::$curl = curl_init($url);
         curl_setopt(self::$curl, CURLOPT_CUSTOMREQUEST, ($post ? "POST" : 'GET'));
         curl_setopt(self::$curl, CURLOPT_RETURNTRANSFER, true);
