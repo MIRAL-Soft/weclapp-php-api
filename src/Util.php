@@ -48,7 +48,7 @@ class Util
         // Close the cURL session
         curl_close($curl);
 
-        // Check if the request was successful
-        return ($result && ($statusCode >= 200) && ($statusCode < 400));
+        // Check if the request was successful (unthorised will be ok as well)
+        return ($result && ($statusCode >= 200) && ($statusCode < 400 || $statusCode == 401));
     }
 }
