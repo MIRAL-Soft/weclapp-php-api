@@ -43,6 +43,9 @@ class APICall
         curl_setopt(self::$curl, CURLOPT_CUSTOMREQUEST, ($post ? "POST" : 'GET'));
         curl_setopt(self::$curl, CURLOPT_RETURNTRANSFER, true);
 
+        // More configuration
+        curl_setopt(self::$curl, CURLOPT_ENCODING, ''); // Encoding reset
+
         // Set Data to curl call
         if ($post) curl_setopt(self::$curl, CURLOPT_POSTFIELDS, json_encode($data));
         curl_setopt(self::$curl, CURLOPT_HTTPHEADER, array(
