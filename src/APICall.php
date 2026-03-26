@@ -2,6 +2,13 @@
 
 namespace miralsoft\weclapp\api;
 
+/**
+ * Legacy static HTTP client for weclapp API v1.
+ *
+ * @deprecated since 2.0 — use \miralsoft\weclapp\api\Client\HttpClient instead.
+ *             The new HttpClient is injected via WeclappClient and supports v2,
+ *             proper exception handling, PUT/DELETE, and rate-limit retries.
+ */
 class APICall
 {
     /** @var object The curl object for this connection */

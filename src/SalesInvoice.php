@@ -4,6 +4,11 @@
 namespace miralsoft\weclapp\api;
 
 
+/**
+ * Legacy SalesInvoice class targeting weclapp API v1.
+ *
+ * @deprecated since 2.0 — use \miralsoft\weclapp\api\Resource\SalesInvoiceResource instead.
+ */
 class SalesInvoice extends WeclappAPICall
 {
 

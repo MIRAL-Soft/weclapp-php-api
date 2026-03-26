@@ -6,6 +6,12 @@ namespace miralsoft\weclapp\api;
 
 use ReflectionClass;
 
+/**
+ * Legacy abstract base class for v1 API calls.
+ *
+ * @deprecated since 2.0 — use \miralsoft\weclapp\api\Resource\AbstractResource instead.
+ *             Instantiate resources via \miralsoft\weclapp\api\Client\WeclappClient.
+ */
 abstract class WeclappAPICall
 {
     /** @var string The main function from the call */

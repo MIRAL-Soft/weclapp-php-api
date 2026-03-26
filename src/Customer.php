@@ -2,6 +2,20 @@
 
 namespace miralsoft\weclapp\api;
 
+/**
+ * Legacy Customer class targeting weclapp API v1.
+ *
+ * @deprecated since 2.0 — use \miralsoft\weclapp\api\Resource\CustomerResource instead.
+ *
+ * @example Migration:
+ *   // Old (v1, deprecated):
+ *   $customer = new Customer();
+ *   $list = $customer->get(1, 50);
+ *
+ *   // New (v2):
+ *   $client = new \miralsoft\weclapp\api\Client\WeclappClient($config);
+ *   $result = $client->customers()->list(QueryBuilder::new()->page(1)->pageSize(50));
+ */
 class Customer extends WeclappAPICall
 {
     /** @var array|null all Customers in list */

@@ -4,6 +4,11 @@
 namespace miralsoft\weclapp\api;
 
 
+/**
+ * Legacy SalesOrder class targeting weclapp API v1.
+ *
+ * @deprecated since 2.0 — use \miralsoft\weclapp\api\Resource\SalesOrderResource instead.
+ */
 class SalesOrder extends WeclappAPICall
 {
 

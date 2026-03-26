@@ -2,6 +2,11 @@
 
 namespace miralsoft\weclapp\api;
 
+/**
+ * Legacy Article class targeting weclapp API v1.
+ *
+ * @deprecated since 2.0 — use \miralsoft\weclapp\api\Resource\ArticleResource instead.
+ */
 class Article extends WeclappAPICall
 {
     /**
