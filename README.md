@@ -1,47 +1,593 @@
-# weclapp-php-api
-This Project is to use the weclapp API with PHP.
+# weclapp PHP API Client
 
-# How to use
-You can download the Package over composer with following line in composer File:
+A professional PHP client library for the **weclapp REST API v2**.
+Provides a clean, typed and modular interface to work with customers, contacts, suppliers,
+articles, sales orders, invoices, quotations and webhooks — without writing a single raw HTTP call.
 
+> **Version 2.0** — migrated from weclapp API v1 to v2.
+> Legacy v1 classes are retained as deprecated wrappers for backward compatibility.
+
+---
+
+## Requirements
+
+| Requirement | Version |
+|---|---|
+| PHP | `^8.3` |
+| weclapp API | `v2` |
+| Guzzle | `^7.8` (auto-installed) |
+
+---
+
+## Installation
+
+```bash
+composer require miralsoft/weclapp-api
 ```
-"require": {
-    "php": ">=7.4.0",<br>
-    "miralsoft/weclapp-api": ">=v1"
+
+---
+
+## Quick Start
+
+```php
+use miralsoft\weclapp\api\Client\WeclappClient;
+use miralsoft\weclapp\api\Config\WeclappConfig;
+
+// 1. Configure — replace with your own tenant and token
+$config = new WeclappConfig(
+    tenant: 'miralsoft',   // your subdomain: https://miralsoft.weclapp.com
+    token:  'your-api-token-here'
+);
+
+// 2. Create the client
+$client = new WeclappClient($config);
+
+// 3. Use it
+$customers = $client->customers()->listAll();
+
+foreach ($customers as $customer) {
+    echo $customer->customerNumber . ' — ' . $customer->getDisplayName() . PHP_EOL;
 }
 ```
 
-# Configuration
-The configuration have to been set in your PHP-Project. You must define 2 constants like this:
+---
+
+## Configuration
+
+`WeclappConfig` is an immutable value object. All parameters are set once at construction time.
+
+```php
+use miralsoft\weclapp\api\Config\WeclappConfig;
+
+$config = new WeclappConfig(
+    tenant:     'miralsoft',      // Subdomain of your weclapp instance
+    token:      'your-token',     // API token from weclapp user settings
+    version:    'v2',             // API version — default: 'v2'
+    timeout:    30,               // HTTP timeout in seconds — default: 30
+    maxRetries: 3,                // Retries on HTTP 429 rate limit — default: 3
+);
+
+// Generated base URL:
+// https://miralsoft.weclapp.com/webapp/api/v2/
+echo $config->getBaseUrl();
+```
+
+> **Security:** The token is never exposed in `var_dump()` or `print_r()` output.
+> `$config->__debugInfo()` returns `***REDACTED***` for the token field.
+
+---
+
+## Available Resources
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `$client->customers()` | `/customer` | Customers (organisations & persons) |
+| `$client->contacts()` | `/contact` | Contact persons linked to customers |
+| `$client->suppliers()` | `/supplier` | Suppliers |
+| `$client->articles()` | `/article` | Products / articles |
+| `$client->articleCategories()` | `/articleCategory` | Article category tree |
+| `$client->salesOrders()` | `/salesOrder` | Sales orders + PDF download |
+| `$client->salesInvoices()` | `/salesInvoice` | Sales invoices + PDF download |
+| `$client->quotations()` | `/quotation` | Quotations + PDF + order conversion |
+| `$client->webhooks()` | `/webhook` | Event-driven webhook subscriptions |
+
+---
+
+## CRUD Operations
+
+Every resource supports the full set of CRUD operations:
+
+```php
+$customers = $client->customers();
+
+// Count
+$total = $customers->count();
+
+// Read single record by ID
+$customer = $customers->find('abc-123');
+
+// Paginated list
+$page = $customers->list(
+    QueryBuilder::new()->page(1)->pageSize(50)->sort('company')
+);
+
+// All records (auto-pagination)
+$all = $customers->listAll();
+
+// Create
+$newCustomer = $customers->create([
+    'company'   => 'Acme GmbH',
+    'partyType' => 'ORGANIZATION',
+    'email'     => 'info@acme.de',
+]);
+
+// Update (include version for optimistic locking)
+$updated = $customers->update('abc-123', [
+    'id'      => 'abc-123',
+    'version' => '3',
+    'phone'   => '+49 30 123456',
+]);
+
+// Delete
+$customers->delete('abc-123');
+```
+
+---
+
+## Filtering & Sorting
+
+Use the fluent `QueryBuilder` to compose filters using the weclapp v2 filter syntax:
+
+```php
+use miralsoft\weclapp\api\Query\QueryBuilder;
+use miralsoft\weclapp\api\Query\FilterOperator;
+
+$result = $client->customers()->list(
+    QueryBuilder::new()
+        ->filterEq('active', true)                    // active-eq=true
+        ->filterIlike('company', 'acme')              // company-ilike=acme
+        ->filterGt('createdDate', 1711400000000)      // createdDate-gt=...
+        ->sort('company')                             // sort=company
+        ->sort('customerNumber', 'desc')              // sort=company,-customerNumber
+        ->page(1)
+        ->pageSize(50)
+);
+
+// Available shorthand methods:
+// ->filterEq()    equals
+// ->filterNeq()   not equals
+// ->filterIlike() case-insensitive contains (LIKE %value%)
+// ->filterGt()    greater than
+// ->filterGte()   greater than or equal
+// ->filterLt()    less than
+// ->filterLte()   less than or equal
+// ->filterIn()    value in list
+// ->filter($field, FilterOperator::IS_NULL)   field is null
+```
+
+---
+
+## Paginated Results
+
+`list()` returns a `PaginatedResultDTO` with full pagination metadata:
+
+```php
+$result = $client->articles()->list(QueryBuilder::new()->page(1)->pageSize(100));
+
+echo $result->total;     // Total matching records across all pages
+echo $result->page;      // Current page number
+echo $result->pageSize;  // Items per page
+echo $result->hasMore;   // true if more pages exist
+echo $result->count();   // Items on this page
+
+// Manually paginate
+$page = 1;
+do {
+    $result = $client->articles()->list(QueryBuilder::new()->page($page)->pageSize(100));
+    foreach ($result->items as $article) {
+        // process $article (ArticleDTO)
+    }
+    $page++;
+} while ($result->hasMore);
+```
+
+---
+
+## Delta Sync — Fetch Only Changed Records
+
+A key feature for integrating weclapp with external systems (e.g. ticket systems, CRMs, shops).
+Instead of loading all records on every run, fetch only what changed since the last sync:
+
+```php
+// --- First run: load everything and remember the timestamp ---
+$allCustomers = $client->customers()->listAll();
+$lastSyncMs   = time() * 1000; // store this in your database or a file
+
+// --- Every subsequent run: fetch only changed records ---
+$changedCustomers = $client->customers()->findModifiedSince($lastSyncMs);
+
+foreach ($changedCustomers as $customer) {
+    // Sync to your external system
+    $mySystem->updateContact($customer->id, [
+        'name'  => $customer->getDisplayName(),
+        'email' => $customer->email,
+        'phone' => $customer->phone,
+    ]);
+
+    // Advance the sync cursor to the latest change
+    $lastSyncMs = max($lastSyncMs, $customer->lastModifiedDate);
+}
+
+// Save $lastSyncMs for the next run
+
+// You can also use a DateTime object:
+$changed = $client->contacts()->findModifiedSince(new DateTime('-1 hour'));
+
+// Or combine with extra filters:
+$changed = $client->customers()->findModifiedSince(
+    since: $lastSyncMs,
+    extra: QueryBuilder::new()->filterEq('active', true)
+);
+```
+
+> All DTOs expose `lastModifiedDate` (epoch ms), `getLastModifiedAt()` (DateTimeImmutable),
+> `createdDate` and `getCreatedAt()` for this purpose.
+
+---
+
+## Entity-Specific Features
+
+### Customers
+
+```php
+$customers = $client->customers();
+
+// Convenience lookups
+$customer  = $customers->findByCustomerNumber('K-10042');
+$results   = $customers->findByCompany('Acme');      // case-insensitive search
+$results   = $customers->findByEmail('info@acme.de');
+
+// Display name (company name or "First Last")
+echo $customer->getDisplayName();
+```
+
+### Contacts
+
+```php
+$contacts = $client->contacts();
+
+// Find all contacts belonging to a customer
+$contacts = $contacts->findByCustomer($customerId);
+
+// Find by email
+$contacts = $contacts->findByEmail('max@acme.de');
+
+echo $contact->getFullName(); // "Max Mustermann"
+```
+
+### Articles
+
+```php
+$articles = $client->articles();
+
+// Find by article number (SKU)
+$article = $articles->findByArticleNumber('ART-001');
+
+// Find all articles in a category
+$articles = $articles->findByCategory($categoryId);
+
+// Find only in-stock articles
+$inStock  = $articles->findInStock();
+
+echo $article->isInStock() ? 'In stock' : 'Out of stock';
+echo $article->availableStock;
+echo $article->salesPrice;
+```
+
+### Article Categories
+
+```php
+$categories = $client->articleCategories();
+
+// Find by name (exact match)
+$category = $categories->findByName('Electronics');
+
+// Find only root categories (no parent)
+$roots = $categories->findRootCategories();
+
+echo $category->isRootCategory() ? 'Root' : 'Sub-category of: ' . $category->parentCategoryName;
+```
+
+### Sales Orders
+
+```php
+$orders = $client->salesOrders();
+
+// Find all orders for a customer
+$orders = $orders->findByCustomer($customerId);
+
+// Find by status
+$open = $orders->findByStatus('ORDER_CONFIRMED');
+
+// Download order confirmation PDF
+$pdf = $orders->getPdf($orderId);
+file_put_contents('order-confirmation.pdf', $pdf);
+
+// Date helpers
+echo $order->getOrderDate()?->format('d.m.Y');
+echo $order->getDeliveryDate()?->format('d.m.Y');
+```
+
+### Sales Invoices
+
+```php
+$invoices = $client->salesInvoices();
+
+// Find open (unpaid) invoices
+$open = $invoices->findOpen();
+echo $invoice->openAmount;
+echo $invoice->isOpen() ? 'Unpaid' : 'Paid';
+
+// Download invoice PDF
+$pdf = $invoices->getPdf($invoiceId);
+file_put_contents('invoice.pdf', $pdf);
+```
+
+### Quotations
+
+```php
+$quotations = $client->quotations();
+
+// Find all quotations for a customer
+$list = $quotations->findByCustomer($customerId);
+
+// Check expiry
+echo $quotation->isExpired() ? 'Expired' : 'Valid until: ' . $quotation->getValidUntil()?->format('d.m.Y');
+
+// Download quotation PDF
+$pdf = $quotations->getPdf($quotationId);
+
+// Convert to sales order
+$order = $quotations->convertToSalesOrder($quotationId);
+echo $order->orderNumber; // e.g. "SO-10042"
+```
+
+### Webhooks
+
+Webhooks let weclapp notify your application in real time when data changes —
+no polling required.
+
+```php
+$webhooks = $client->webhooks();
+
+// Register a new webhook
+$webhook = $webhooks->register(
+    eventType:   'party.updated',                          // triggers on any customer/contact/supplier change
+    callbackUrl: 'https://my-app.example.com/weclapp',    // must be HTTPS and publicly reachable
+    description: 'Sync customer changes to ticket system'
+);
+
+// Available event types:
+// article.created / article.updated / article.deleted
+// salesOrder.created / salesOrder.updated / salesOrder.deleted
+// salesInvoice.created / salesInvoice.updated
+// quotation.created / quotation.updated
+// party.created / party.updated / party.deleted
+
+// List all registered webhooks
+$all = $webhooks->all();
+
+// Remove a webhook
+$webhooks->delete($webhook->id);
+```
+
+---
+
+## Error Handling
+
+All errors throw typed exceptions. Catch `WeclappApiException` for a single catch-all,
+or use specific subtypes for fine-grained handling:
+
+```php
+use miralsoft\weclapp\api\Exception\AuthenticationException;
+use miralsoft\weclapp\api\Exception\NotFoundException;
+use miralsoft\weclapp\api\Exception\ValidationException;
+use miralsoft\weclapp\api\Exception\RateLimitException;
+use miralsoft\weclapp\api\Exception\ServerException;
+use miralsoft\weclapp\api\Exception\WeclappApiException;
+
+try {
+    $customer = $client->customers()->find('non-existent-id');
+
+} catch (AuthenticationException $e) {
+    // HTTP 401 — invalid or missing API token
+    echo 'Auth error: ' . $e->getMessage();
+
+} catch (NotFoundException $e) {
+    // HTTP 404 — record does not exist
+    echo 'Not found: ' . $e->getMessage();
+
+} catch (ValidationException $e) {
+    // HTTP 400 — weclapp v2 strict validation failed
+    foreach ($e->getErrors() as $error) {
+        echo $error['field'] . ': ' . $error['message'] . PHP_EOL;
+    }
+
+} catch (RateLimitException $e) {
+    // HTTP 429 — retries exhausted (automatic retry with backoff is built-in)
+    echo 'Rate limited. Retry after: ' . $e->getRetryAfter() . 's';
+
+} catch (ServerException $e) {
+    // HTTP 5xx — weclapp server error
+    echo 'weclapp server error (HTTP ' . $e->getStatusCode() . ')';
+
+} catch (WeclappApiException $e) {
+    // Any other API error
+    echo 'API error: ' . $e->getMessage();
+    echo 'URL: '       . $e->getRequestUrl();
+    echo 'Response: '  . $e->getResponseBody();
+}
+```
+
+### Rate Limiting
+
+HTTP 429 responses are handled automatically. The `RateLimiter` retries with
+exponential backoff using the `Retry-After` header value:
 
 ```
+Attempt 1 → wait  Retry-After seconds
+Attempt 2 → wait  Retry-After × 2 seconds
+Attempt 3 → wait  Retry-After × 4 seconds
+Attempt 4 → throws RateLimitException
+```
+
+Configure the number of retries via `WeclappConfig`:
+
+```php
+$config = new WeclappConfig(tenant: 'miralsoft', token: 'token', maxRetries: 5);
+```
+
+---
+
+## Caching
+
+Inject a PSR-16 cache to avoid redundant `listAll()` calls.
+Any PSR-16 compatible library works (Symfony Cache, Laravel Cache, etc.):
+
+```php
+use Symfony\Component\Cache\Adapter\FilesystemAdapter;
+use Symfony\Component\Cache\Psr16Cache;
+
+$cache  = new Psr16Cache(new FilesystemAdapter());
+$client = new WeclappClient($config, cache: $cache);
+
+// First call: fetches from API and caches for 5 minutes
+$articles = $client->articles()->listAll();
+
+// Second call within 5 minutes: served from cache
+$articles = $client->articles()->listAll();
+```
+
+---
+
+## Testing / Custom HTTP Client
+
+Inject a Guzzle `MockHandler` for unit tests — no real API calls required:
+
+```php
+use GuzzleHttp\Client;
+use GuzzleHttp\Handler\MockHandler;
+use GuzzleHttp\HandlerStack;
+use GuzzleHttp\Psr7\Response;
+
+$mock   = new MockHandler([
+    new Response(200, [], json_encode([
+        'result' => [['id' => 'abc', 'customerNumber' => 'K-1', ...]]
+    ])),
+]);
+$guzzle = new Client(['handler' => HandlerStack::create($mock), 'http_errors' => false]);
+$client = new WeclappClient($config, guzzle: $guzzle);
+
+$result = $client->customers()->list(); // uses mocked response
+```
+
+---
+
+## DTO Reference
+
+All API responses are returned as typed, immutable DTOs.
+
+### Common fields (all DTOs)
+
+| Field | Type | Description |
+|---|---|---|
+| `id` | `string` | Internal weclapp UUID |
+| `version` | `string` | Optimistic locking version |
+| `createdDate` | `int` | Creation timestamp (epoch ms) |
+| `lastModifiedDate` | `int` | Last modification timestamp (epoch ms) |
+| `getCreatedAt()` | `?DateTimeImmutable` | Creation date as object |
+| `getLastModifiedAt()` | `?DateTimeImmutable` | Last modification date as object |
+| `toArray()` | `array` | Serialise back to associative array |
+
+### CustomerDTO
+
+| Field | Type |
+|---|---|
+| `customerNumber` | `string` |
+| `company` | `string` |
+| `partyType` | `string` (`ORGANIZATION` / `PERSON`) |
+| `firstName`, `lastName` | `?string` |
+| `email`, `phone`, `mobile` | `?string` |
+| `active`, `blocked`, `insolvent` | `bool` |
+| `currencyName`, `salesChannel` | `?string` |
+| `addresses`, `contacts`, `customAttributes` | `array` |
+| `getDisplayName()` | `string` |
+
+### ArticleDTO
+
+| Field | Type |
+|---|---|
+| `articleNumber` | `string` |
+| `name` | `string` |
+| `salesPrice`, `purchasePrice` | `?float` |
+| `availableStock`, `reservedStock` | `?float` |
+| `active`, `sellable`, `stockable` | `bool` |
+| `articleCategoryId`, `unit` | `?string` |
+| `isInStock()` | `bool` |
+
+### SalesOrderDTO / SalesInvoiceDTO / QuotationDTO
+
+| Field | Type |
+|---|---|
+| `orderNumber` / `invoiceNumber` / `quotationNumber` | `string` |
+| `status` | `string` |
+| `customerId` | `string` |
+| `netAmount`, `grossAmount` | `?float` |
+| `currency` | `?string` |
+| `orderItems` / `invoiceItems` / `quotationItems` | `array` |
+
+---
+
+## Migration from v1
+
+Version 1 classes (`Customer`, `Article`, `SalesOrder`, etc.) are still present but
+marked `@deprecated`. They continue to work against the v1 API endpoint until you migrate.
+
+```php
+// ❌ Old (v1, deprecated — API shuts down August 2025)
 use miralsoft\weclapp\api\Config;
-
-Config::$URI = 'https://xxx.weclapp.com/webapp/api/v1/';
-Config::$TOKEN = 'xxx';
-```
-
-Replace the xxx with your own data.
-
-# Full example
-To get a list of customers, here is a example:
-
-```
 use miralsoft\weclapp\api\Customer;
-use miralsoft\weclapp\api\Config;
 
-Config::$URI = 'https://xxx.weclapp.com/webapp/api/v1/';
-Config::$TOKEN = 'xxx';
+Config::$URI   = 'https://miralsoft.weclapp.com/webapp/api/v1/';
+Config::$TOKEN = 'your-token';
 
 $customer = new Customer();
+$list     = $customer->get(1, 50, 'customerNumber');
 
-$result = $customer->get(1, 100, 'customerNumber');
+// ✅ New (v2)
+use miralsoft\weclapp\api\Client\WeclappClient;
+use miralsoft\weclapp\api\Config\WeclappConfig;
+use miralsoft\weclapp\api\Query\QueryBuilder;
 
-if (is_array($result)) {
-    echo 'Count results: ' . count($result);
-}
-echo '<br><br>';
-print_r($result);
+$config = new WeclappConfig(tenant: 'miralsoft', token: 'your-token');
+$client = new WeclappClient($config);
+
+$result = $client->customers()->list(
+    QueryBuilder::new()->page(1)->pageSize(50)->sort('customerNumber')
+);
 ```
 
-You get a list of first 100 customers and can use it in any way.
+---
+
+## Running the Tests
+
+```bash
+composer install
+vendor/bin/phpunit
+```
+
+---
+
+## License
+
+Proprietary — © miralsoft, Michael Tosch
