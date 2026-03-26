@@ -279,15 +279,26 @@ abstract class AbstractResource
     /**
      * Invalidate the PSR-16 cache for this resource's listAll() results.
      *
-     * Call this after write operations (create/update/delete) when you need
-     * the next listAll() call to return fresh data immediately.
+     * Pass the same QueryBuilder you used in listAll() to clear that specific
+     * cached result. Pass null (default) to clear the unfiltered listAll() cache.
+     *
+     * @param QueryBuilder|null $query The query whose cache entry should be removed.
+     *                                 Defaults to null (clears the no-filter cache).
      *
      * @throws \Psr\SimpleCache\InvalidArgumentException
+     *
+     * @example
+     * // Clear the unfiltered listAll() cache:
+     * $client->articles()->clearCache();
+     *
+     * // Clear a filtered cache:
+     * $query = QueryBuilder::new()->filterEq('active', true);
+     * $client->articles()->clearCache($query);
      */
-    public function clearCache(): void
+    public function clearCache(?QueryBuilder $query = null): void
     {
         if ($this->cache !== null) {
-            $this->cache->delete($this->buildCacheKey('listAll', null));
+            $this->cache->delete($this->buildCacheKey('listAll', $query));
         }
     }
 

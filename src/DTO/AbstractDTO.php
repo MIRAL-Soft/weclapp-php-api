@@ -179,15 +179,19 @@ abstract class AbstractDTO
     /**
      * Convert an epoch-millisecond timestamp to DateTimeImmutable.
      *
-     * Returns null if the value is missing, zero or null.
+     * Returns null if the value is missing, null, or zero.
+     * Epoch zero (1970-01-01) is treated as absent because weclapp never
+     * uses it as a real business date — it indicates a field that was not set.
      */
     protected static function dateFromEpochMs(array $data, string $key): ?DateTimeImmutable
     {
-        if (empty($data[$key])) {
+        $value = $data[$key] ?? null;
+
+        if ($value === null || $value === 0 || $value === '') {
             return null;
         }
 
-        $epochSeconds = (int) ($data[$key] / 1000);
+        $epochSeconds = (int) ($value / 1000);
 
         return DateTimeImmutable::createFromFormat('U', (string) $epochSeconds) ?: null;
     }

@@ -116,13 +116,14 @@ final class QuotationDTO extends AbstractDTO
 
     /**
      * Returns true if the quotation has expired (validUntilDate is in the past).
+     *
+     * Compares as DateTimeImmutable objects to avoid integer overflow and to
+     * make the intent explicit. Returns false if no expiry date is set.
      */
     public function isExpired(): bool
     {
-        if ($this->validUntilDate === null) {
-            return false;
-        }
+        $validUntil = $this->getValidUntil();
 
-        return $this->validUntilDate < (time() * 1000);
+        return $validUntil !== null && $validUntil < new DateTimeImmutable();
     }
 }

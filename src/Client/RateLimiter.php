@@ -10,15 +10,18 @@ use miralsoft\weclapp\api\Exception\ServerException;
 /**
  * Wraps API calls with automatic retry logic for HTTP 429 rate-limit and 5xx server errors.
  *
- * Uses exponential backoff: each retry waits twice as long as the previous one,
- * starting from the Retry-After header value (or a default base delay).
- * The delay is capped at 5 minutes to prevent excessively long waits.
+ * Uses exponential backoff with a server-enforced floor: each retry waits the
+ * larger of the server's Retry-After header value and a locally calculated
+ * exponential delay (doubling each attempt). The delay is capped at 5 minutes.
  *
- * Delay schedule (with base delay of 1 second, maxRetries = 3):
- *   Attempt 1 → wait  1s  (or Retry-After value)
- *   Attempt 2 → wait  2s
- *   Attempt 3 → wait  4s
+ * Delay schedule example (base delay 1s, Retry-After = 3s, maxRetries = 3):
+ *   Attempt 1 → max(3s, 1s) = 3s
+ *   Attempt 2 → max(3s, 2s) = 3s
+ *   Attempt 3 → max(3s, 4s) = 4s
  *   Attempt 4 → throws RateLimitException / ServerException
+ *
+ * For 5xx errors (no Retry-After header), pure exponential backoff is used:
+ *   1s → 2s → 4s → throws ServerException
  *
  * @example
  * $limiter = new RateLimiter(maxRetries: 3);
@@ -82,22 +85,21 @@ final class RateLimiter
     /**
      * Wait before the next retry for a 429 rate-limit response.
      *
-     * Uses the Retry-After value from the exception if available,
-     * otherwise calculates exponential backoff from the base delay.
+     * Takes the larger of the server's Retry-After value and the local exponential
+     * backoff to always respect the server's recommendation while still applying
+     * an increasing floor delay between retries.
      *
      * @param RateLimitException $e       The rate limit exception containing retry info.
      * @param int                $attempt The current attempt number (1-based).
      */
     private function waitForRateLimit(RateLimitException $e, int $attempt): void
     {
-        if ($e->getRetryAfter() > 0) {
-            // Use the server's recommended wait time, then apply exponential backoff on top.
-            $delayMs = $e->getRetryAfter() * 1000 * (2 ** ($attempt - 1));
-        } else {
-            $delayMs = $this->baseDelayMs * (2 ** ($attempt - 1));
-        }
+        $retryAfterMs = $e->getRetryAfter() * 1000;
+        $backoffMs    = $this->baseDelayMs * (2 ** ($attempt - 1));
 
-        $this->sleep($delayMs);
+        // Use the larger of the two: always honour the server's Retry-After,
+        // but fall back to local backoff if Retry-After is shorter.
+        $this->sleep(max($retryAfterMs, $backoffMs));
     }
 
     /**
