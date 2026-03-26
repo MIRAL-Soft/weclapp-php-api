@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace miralsoft\weclapp\api\Resource;
 
+use InvalidArgumentException;
 use miralsoft\weclapp\api\DTO\WebhookDTO;
 use miralsoft\weclapp\api\Exception\WeclappApiException;
 
@@ -39,13 +40,23 @@ class WebhookResource extends AbstractResource
      * Register a new webhook subscription.
      *
      * @param string      $eventType   The event type to subscribe to (e.g. "party.updated").
-     * @param string      $callbackUrl The HTTPS URL to deliver events to.
+     * @param string      $callbackUrl The HTTPS URL to deliver events to. Must start with "https://".
      * @param string|null $description Optional human-readable description.
      *
+     * @throws InvalidArgumentException If the callbackUrl does not use HTTPS.
      * @throws WeclappApiException
      */
     public function register(string $eventType, string $callbackUrl, ?string $description = null): WebhookDTO
     {
+        if (!str_starts_with($callbackUrl, 'https://')) {
+            throw new InvalidArgumentException(
+                sprintf(
+                    'Webhook callbackUrl must use HTTPS. Got: "%s".',
+                    $callbackUrl,
+                )
+            );
+        }
+
         $data = [
             'eventType'   => $eventType,
             'callbackUrl' => $callbackUrl,

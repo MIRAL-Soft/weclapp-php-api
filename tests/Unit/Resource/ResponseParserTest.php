@@ -6,6 +6,7 @@ namespace miralsoft\weclapp\api\Tests\Unit\Resource;
 
 use miralsoft\weclapp\api\Exception\AuthenticationException;
 use miralsoft\weclapp\api\Exception\NotFoundException;
+use miralsoft\weclapp\api\Exception\OptimisticLockException;
 use miralsoft\weclapp\api\Exception\RateLimitException;
 use miralsoft\weclapp\api\Exception\ServerException;
 use miralsoft\weclapp\api\Exception\ValidationException;
@@ -100,6 +101,13 @@ class ResponseParserTest extends TestCase
         $this->expectException(ServerException::class);
 
         ResponseParser::parse(503, '');
+    }
+
+    public function test_throws_optimistic_lock_exception_on_409(): void
+    {
+        $this->expectException(OptimisticLockException::class);
+
+        ResponseParser::parse(409, '{"message":"Conflict"}');
     }
 
     public function test_throws_on_invalid_json(): void

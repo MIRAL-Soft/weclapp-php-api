@@ -15,6 +15,7 @@ use miralsoft\weclapp\api\Resource\SalesInvoiceResource;
 use miralsoft\weclapp\api\Resource\SalesOrderResource;
 use miralsoft\weclapp\api\Resource\SupplierResource;
 use miralsoft\weclapp\api\Resource\WebhookResource;
+use Psr\Log\LoggerInterface;
 use Psr\SimpleCache\CacheInterface;
 
 /**
@@ -22,6 +23,7 @@ use Psr\SimpleCache\CacheInterface;
  *
  * Creates and returns all available API resource classes.
  * Inject a PSR-16 cache to enable listAll() caching.
+ * Inject a PSR-3 logger to enable request/response tracing.
  *
  * @example Basic usage:
  * $config = new WeclappConfig(tenant: 'miralsoft', token: 'your-token');
@@ -30,9 +32,16 @@ use Psr\SimpleCache\CacheInterface;
  * $customers = $client->customers()->listAll();
  * $article   = $client->articles()->findByArticleNumber('ART-001');
  *
+ * @example From environment variables:
+ * $client = new WeclappClient(WeclappConfig::fromEnv());
+ *
  * @example With PSR-16 cache (e.g. Symfony Cache):
  * $cache  = new FilesystemAdapter();
  * $client = new WeclappClient($config, cache: $cache);
+ *
+ * @example With PSR-3 logger (e.g. Monolog):
+ * $logger = new Logger('weclapp');
+ * $client = new WeclappClient($config, logger: $logger);
  *
  * @example Delta-sync (fetch only changed records since last run):
  * $changed = $client->customers()->findModifiedSince($lastSyncTimestampMs);
@@ -55,13 +64,16 @@ final class WeclappClient
      * @param GuzzleClient|null    $guzzle Optional Guzzle HTTP client for injection.
      *                                     Defaults to a new client built from $config.
      *                                     Pass a mock client for unit testing.
+     * @param LoggerInterface|null $logger Optional PSR-3 logger for request/response tracing.
+     *                                     Useful for debugging API calls in development.
      */
     public function __construct(
-        WeclappConfig        $config,
+        WeclappConfig                  $config,
         private readonly ?CacheInterface $cache  = null,
-        ?GuzzleClient        $guzzle = null,
+        ?GuzzleClient                  $guzzle = null,
+        ?LoggerInterface               $logger = null,
     ) {
-        $this->http        = new HttpClient($config, $guzzle);
+        $this->http        = new HttpClient($config, $guzzle, $logger);
         $this->rateLimiter = new RateLimiter($config->getMaxRetries());
     }
 

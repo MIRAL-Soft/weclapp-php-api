@@ -56,20 +56,43 @@ foreach ($customers as $customer) {
 
 `WeclappConfig` is an immutable value object. All parameters are set once at construction time.
 
+### Constructor
+
 ```php
 use miralsoft\weclapp\api\Config\WeclappConfig;
 
 $config = new WeclappConfig(
-    tenant:     'miralsoft',      // Subdomain of your weclapp instance
-    token:      'your-token',     // API token from weclapp user settings
-    version:    'v2',             // API version — default: 'v2'
-    timeout:    30,               // HTTP timeout in seconds — default: 30
-    maxRetries: 3,                // Retries on HTTP 429 rate limit — default: 3
+    tenant:         'miralsoft',  // Subdomain of your weclapp instance
+    token:          'your-token', // API token from weclapp user settings
+    version:        'v2',         // API version — default: 'v2'
+    timeout:        30,           // HTTP request timeout in seconds — default: 30
+    connectTimeout: 10,           // TCP connect timeout in seconds — default: 10
+    maxRetries:     3,            // Retries on HTTP 429 / 5xx errors — default: 3
 );
 
 // Generated base URL:
 // https://miralsoft.weclapp.com/webapp/api/v2/
 echo $config->getBaseUrl();
+```
+
+### From Environment Variables
+
+```php
+// Reads WECLAPP_TENANT and WECLAPP_TOKEN (required).
+// Optional: WECLAPP_VERSION, WECLAPP_TIMEOUT, WECLAPP_CONNECT_TIMEOUT, WECLAPP_MAX_RETRIES
+$config = WeclappConfig::fromEnv();
+```
+
+### From Array (e.g. from a config file)
+
+```php
+$config = WeclappConfig::fromArray([
+    'tenant'         => 'miralsoft',
+    'token'          => 'your-token',
+    'timeout'        => 60,
+    'connectTimeout' => 5,
+    'maxRetries'     => 5,
+]);
 ```
 
 > **Security:** The token is never exposed in `var_dump()` or `print_r()` output.
@@ -391,6 +414,7 @@ or use specific subtypes for fine-grained handling:
 ```php
 use miralsoft\weclapp\api\Exception\AuthenticationException;
 use miralsoft\weclapp\api\Exception\NotFoundException;
+use miralsoft\weclapp\api\Exception\OptimisticLockException;
 use miralsoft\weclapp\api\Exception\ValidationException;
 use miralsoft\weclapp\api\Exception\RateLimitException;
 use miralsoft\weclapp\api\Exception\ServerException;
@@ -413,12 +437,21 @@ try {
         echo $error['field'] . ': ' . $error['message'] . PHP_EOL;
     }
 
+} catch (OptimisticLockException $e) {
+    // HTTP 409 — version conflict: record was changed by another process
+    // Re-fetch the latest version and retry the update
+    $fresh = $client->customers()->find($customerId);
+    $client->customers()->update($customerId, [
+        'version' => $fresh->version,
+        'company' => 'New Name',
+    ]);
+
 } catch (RateLimitException $e) {
     // HTTP 429 — retries exhausted (automatic retry with backoff is built-in)
     echo 'Rate limited. Retry after: ' . $e->getRetryAfter() . 's';
 
 } catch (ServerException $e) {
-    // HTTP 5xx — weclapp server error
+    // HTTP 5xx — weclapp server error (also auto-retried, see below)
     echo 'weclapp server error (HTTP ' . $e->getStatusCode() . ')';
 
 } catch (WeclappApiException $e) {
@@ -429,16 +462,16 @@ try {
 }
 ```
 
-### Rate Limiting
+### Rate Limiting & 5xx Retry
 
-HTTP 429 responses are handled automatically. The `RateLimiter` retries with
-exponential backoff using the `Retry-After` header value:
+HTTP 429 **and** HTTP 5xx responses are handled automatically with exponential backoff.
+The delay is capped at 5 minutes per attempt regardless of the `Retry-After` value:
 
 ```
-Attempt 1 → wait  Retry-After seconds
+Attempt 1 → wait  Retry-After seconds  (or 1s for 5xx)
 Attempt 2 → wait  Retry-After × 2 seconds
 Attempt 3 → wait  Retry-After × 4 seconds
-Attempt 4 → throws RateLimitException
+Attempt 4 → throws RateLimitException / ServerException
 ```
 
 Configure the number of retries via `WeclappConfig`:
@@ -464,8 +497,120 @@ $client = new WeclappClient($config, cache: $cache);
 // First call: fetches from API and caches for 5 minutes
 $articles = $client->articles()->listAll();
 
-// Second call within 5 minutes: served from cache
+// Second call within 5 minutes: served from cache, no HTTP request
 $articles = $client->articles()->listAll();
+
+// Invalidate after a write
+$client->articles()->create([...]);
+$client->articles()->clearCache(); // next listAll() will re-fetch
+```
+
+---
+
+## PSR-3 Logging
+
+Inject any PSR-3 logger (e.g. Monolog) to trace all HTTP requests and responses:
+
+```php
+use Monolog\Logger;
+use Monolog\Handler\StreamHandler;
+
+$logger = new Logger('weclapp');
+$logger->pushHandler(new StreamHandler('weclapp.log'));
+
+$client = new WeclappClient($config, logger: $logger);
+
+// Logs at DEBUG level:
+// [weclapp] GET customer/abc-123
+// [weclapp] 200 GET customer/abc-123 (42ms)
+```
+
+---
+
+## Memory-Efficient Streaming with `cursor()`
+
+For very large datasets, use `cursor()` instead of `listAll()`.
+It yields DTOs one by one using a PHP Generator — only one page is in memory at a time:
+
+```php
+foreach ($client->customers()->cursor() as $customer) {
+    $mySystem->sync($customer);
+    // Each customer is released from memory after this iteration
+}
+
+// With a filter:
+$query = QueryBuilder::new()->filterEq('active', true)->sort('company');
+foreach ($client->articles()->cursor($query) as $article) {
+    echo $article->articleNumber . PHP_EOL;
+}
+```
+
+> Use `cursor()` when processing tens of thousands of records to avoid memory exhaustion.
+> For smaller datasets or when you need the full list upfront, `listAll()` is simpler.
+
+---
+
+## Status Enums
+
+Use the provided enums to avoid magic string comparisons:
+
+```php
+use miralsoft\weclapp\api\Enum\SalesOrderStatus;
+use miralsoft\weclapp\api\Enum\SalesInvoiceStatus;
+use miralsoft\weclapp\api\Enum\QuotationStatus;
+use miralsoft\weclapp\api\Enum\WebhookEventType;
+
+// Comparing order status
+if (SalesOrderStatus::tryFrom($order->status) === SalesOrderStatus::Confirmed) {
+    // process confirmed orders
+}
+
+// Filter by status using enum value
+$confirmed = $client->salesOrders()->list(
+    QueryBuilder::new()->filterEq('status', SalesOrderStatus::Confirmed->value)
+);
+
+// Use enum when registering webhooks
+$client->webhooks()->register(
+    eventType:   WebhookEventType::PartyUpdated->value,
+    callbackUrl: 'https://my-app.example.com/webhooks/weclapp',
+);
+```
+
+---
+
+## Webhook Signature Verification
+
+Always verify the HMAC-SHA256 signature on incoming webhook requests to prevent spoofing:
+
+```php
+use miralsoft\weclapp\api\Util\WebhookValidator;
+
+// In your webhook handler (e.g. a Symfony controller):
+$secret    = $_ENV['WECLAPP_WEBHOOK_SECRET'];
+$payload   = file_get_contents('php://input');
+$signature = $_SERVER['HTTP_X_WECLAPP_SIGNATURE'] ?? '';
+
+if (!WebhookValidator::verify($payload, $signature, $secret)) {
+    http_response_code(401);
+    exit('Invalid webhook signature.');
+}
+
+$event = json_decode($payload, true);
+// Process $event safely...
+```
+
+---
+
+## Cache Management
+
+After write operations you may want to invalidate the cache immediately:
+
+```php
+$client->articles()->create(['articleNumber' => 'ART-NEW', 'name' => 'New Product']);
+
+// Invalidate so the next listAll() fetches fresh data
+$client->articles()->clearCache();
 ```
 
 ---

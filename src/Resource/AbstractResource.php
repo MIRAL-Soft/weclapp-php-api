@@ -150,7 +150,7 @@ abstract class AbstractResource
 
         $all      = [];
         $page     = 1;
-        $pageSize = 100; // Larger pages for efficiency
+        $pageSize = 1000; // Maximum allowed by weclapp API for efficiency
 
         // Clone the query to avoid mutating the caller's instance
         $q = clone ($query ?? QueryBuilder::new());
@@ -274,6 +274,57 @@ abstract class AbstractResource
         $q->createdSince($since)->sortByCreated('asc');
 
         return $this->listAll($q);
+    }
+
+    /**
+     * Invalidate the PSR-16 cache for this resource's listAll() results.
+     *
+     * Call this after write operations (create/update/delete) when you need
+     * the next listAll() call to return fresh data immediately.
+     *
+     * @throws \Psr\SimpleCache\InvalidArgumentException
+     */
+    public function clearCache(): void
+    {
+        if ($this->cache !== null) {
+            $this->cache->delete($this->buildCacheKey('listAll', null));
+        }
+    }
+
+    /**
+     * Stream all matching records as a memory-efficient generator.
+     *
+     * Unlike listAll() which loads all pages into memory, cursor() yields
+     * DTOs one by one while paginating lazily. Ideal for large datasets.
+     *
+     * @param QueryBuilder|null $query Optional filters and sort parameters.
+     * @return \Generator<int, T>
+     *
+     * @throws WeclappApiException
+     *
+     * @example
+     * foreach ($client->customers()->cursor() as $customer) {
+     *     $crm->sync($customer);
+     * }
+     */
+    public function cursor(?QueryBuilder $query = null): \Generator
+    {
+        $page     = 1;
+        $pageSize = 100;
+
+        $q = clone ($query ?? QueryBuilder::new());
+        $q->pageSize($pageSize);
+
+        do {
+            $q->page($page);
+            $result = $this->list($q);
+
+            foreach ($result->items as $item) {
+                yield $item;
+            }
+
+            $page++;
+        } while ($result->hasMore);
     }
 
     /**

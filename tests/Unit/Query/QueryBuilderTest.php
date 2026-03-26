@@ -142,6 +142,24 @@ class QueryBuilderTest extends TestCase
         self::assertSame('', $queryString);
     }
 
+    public function test_builds_is_null_filter(): void
+    {
+        $query = QueryBuilder::new()
+            ->filter('deletedDate', \miralsoft\weclapp\api\Query\FilterOperator::IS_NULL)
+            ->build();
+
+        self::assertStringContainsString('deletedDate-is-null=true', $query);
+    }
+
+    public function test_builds_not_null_filter(): void
+    {
+        $query = QueryBuilder::new()
+            ->filter('externalId', \miralsoft\weclapp\api\Query\FilterOperator::NOT_NULL)
+            ->build();
+
+        self::assertStringContainsString('externalId-not-null=true', $query);
+    }
+
     public function test_fluent_interface_returns_same_instance(): void
     {
         $builder = QueryBuilder::new();

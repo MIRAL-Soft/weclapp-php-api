@@ -6,6 +6,7 @@ namespace miralsoft\weclapp\api\Tests\Unit\Exception;
 
 use miralsoft\weclapp\api\Exception\AuthenticationException;
 use miralsoft\weclapp\api\Exception\NotFoundException;
+use miralsoft\weclapp\api\Exception\OptimisticLockException;
 use miralsoft\weclapp\api\Exception\RateLimitException;
 use miralsoft\weclapp\api\Exception\ServerException;
 use miralsoft\weclapp\api\Exception\ValidationException;
@@ -24,6 +25,14 @@ class ExceptionHierarchyTest extends TestCase
         self::assertInstanceOf(WeclappApiException::class, new ValidationException('test'));
         self::assertInstanceOf(WeclappApiException::class, new RateLimitException('test'));
         self::assertInstanceOf(WeclappApiException::class, new ServerException('test'));
+        self::assertInstanceOf(WeclappApiException::class, new OptimisticLockException());
+    }
+
+    public function test_optimistic_lock_exception_has_409_status(): void
+    {
+        $e = new OptimisticLockException();
+
+        self::assertSame(409, $e->getStatusCode());
     }
 
     public function test_weclapp_api_exception_extends_runtime_exception(): void

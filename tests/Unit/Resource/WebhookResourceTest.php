@@ -8,6 +8,7 @@ use GuzzleHttp\Client as GuzzleClient;
 use GuzzleHttp\Handler\MockHandler;
 use GuzzleHttp\HandlerStack;
 use GuzzleHttp\Psr7\Response;
+use InvalidArgumentException;
 use miralsoft\weclapp\api\Client\WeclappClient;
 use miralsoft\weclapp\api\Config\WeclappConfig;
 use miralsoft\weclapp\api\DTO\WebhookDTO;
@@ -83,5 +84,28 @@ class WebhookResourceTest extends TestCase
         self::assertSame('wh-1', $webhook->id);
         self::assertSame('party.updated', $webhook->eventType);
         self::assertSame('Sync to DocBee', $webhook->description);
+    }
+
+    public function test_register_throws_on_http_callback_url(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessageMatches('/https/i');
+
+        $client = $this->makeClient([]);
+        $client->webhooks()->register(
+            eventType:   'party.updated',
+            callbackUrl: 'http://insecure.example.com/webhook',
+        );
+    }
+
+    public function test_register_accepts_https_callback_url(): void
+    {
+        $client  = $this->makeClient([new Response(201, [], json_encode($this->webhookPayload()))]);
+        $webhook = $client->webhooks()->register(
+            eventType:   'party.updated',
+            callbackUrl: 'https://secure.example.com/webhook',
+        );
+
+        self::assertInstanceOf(WebhookDTO::class, $webhook);
     }
 }

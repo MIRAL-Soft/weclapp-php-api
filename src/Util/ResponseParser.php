@@ -6,6 +6,7 @@ namespace miralsoft\weclapp\api\Util;
 
 use miralsoft\weclapp\api\Exception\AuthenticationException;
 use miralsoft\weclapp\api\Exception\NotFoundException;
+use miralsoft\weclapp\api\Exception\OptimisticLockException;
 use miralsoft\weclapp\api\Exception\RateLimitException;
 use miralsoft\weclapp\api\Exception\ServerException;
 use miralsoft\weclapp\api\Exception\ValidationException;
@@ -37,6 +38,7 @@ final class ResponseParser
      * @throws AuthenticationException  On HTTP 401.
      * @throws NotFoundException        On HTTP 404.
      * @throws ValidationException      On HTTP 400 with validation errors.
+     * @throws OptimisticLockException  On HTTP 409 (version conflict).
      * @throws RateLimitException       On HTTP 429.
      * @throws ServerException          On HTTP 5xx.
      * @throws WeclappApiException      On any other error status.
@@ -70,6 +72,15 @@ final class ResponseParser
             throw new RateLimitException(
                 'Rate limit exceeded. Request will be retried automatically.',
                 $retryAfter,
+                $url,
+                $body,
+            );
+        }
+
+        if ($statusCode === 409) {
+            throw new OptimisticLockException(
+                'Optimistic lock conflict: the record was modified by another process. Re-fetch and retry.',
+                409,
                 $url,
                 $body,
             );

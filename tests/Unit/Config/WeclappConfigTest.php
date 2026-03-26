@@ -89,4 +89,52 @@ class WeclappConfigTest extends TestCase
 
         self::assertSame(0, $config->getMaxRetries());
     }
+
+    public function test_connect_timeout_defaults_to_10(): void
+    {
+        $config = new WeclappConfig(tenant: 'miralsoft', token: 'token');
+
+        self::assertSame(10, $config->getConnectTimeout());
+    }
+
+    public function test_connect_timeout_can_be_configured(): void
+    {
+        $config = new WeclappConfig(tenant: 'miralsoft', token: 'token', connectTimeout: 5);
+
+        self::assertSame(5, $config->getConnectTimeout());
+    }
+
+    public function test_from_array_creates_config(): void
+    {
+        $config = WeclappConfig::fromArray([
+            'tenant'  => 'miralsoft',
+            'token'   => 'abc-token',
+            'timeout' => 60,
+        ]);
+
+        self::assertSame('miralsoft', $config->getTenant());
+        self::assertSame('abc-token', $config->getToken());
+        self::assertSame(60, $config->getTimeout());
+    }
+
+    public function test_from_array_throws_on_missing_tenant(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+
+        WeclappConfig::fromArray(['token' => 'abc']);
+    }
+
+    public function test_from_env_creates_config(): void
+    {
+        putenv('WECLAPP_TENANT=envtenant');
+        putenv('WECLAPP_TOKEN=envtoken');
+
+        $config = WeclappConfig::fromEnv();
+
+        self::assertSame('envtenant', $config->getTenant());
+        self::assertSame('envtoken', $config->getToken());
+
+        putenv('WECLAPP_TENANT');
+        putenv('WECLAPP_TOKEN');
+    }
 }

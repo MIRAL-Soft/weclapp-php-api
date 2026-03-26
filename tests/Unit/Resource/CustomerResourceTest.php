@@ -8,8 +8,6 @@ use GuzzleHttp\Client as GuzzleClient;
 use GuzzleHttp\Handler\MockHandler;
 use GuzzleHttp\HandlerStack;
 use GuzzleHttp\Psr7\Response;
-use miralsoft\weclapp\api\Client\HttpClient;
-use miralsoft\weclapp\api\Client\RateLimiter;
 use miralsoft\weclapp\api\Client\WeclappClient;
 use miralsoft\weclapp\api\Config\WeclappConfig;
 use miralsoft\weclapp\api\DTO\CustomerDTO;
@@ -17,7 +15,6 @@ use miralsoft\weclapp\api\DTO\PaginatedResultDTO;
 use miralsoft\weclapp\api\Exception\AuthenticationException;
 use miralsoft\weclapp\api\Exception\NotFoundException;
 use miralsoft\weclapp\api\Exception\RateLimitException;
-use miralsoft\weclapp\api\Resource\CustomerResource;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -269,5 +266,104 @@ class CustomerResourceTest extends TestCase
         ]);
 
         $client->customers()->findByCustomerNumber('K-NONEXISTENT');
+    }
+
+    // -------------------------------------------------------------------------
+    // cursor()
+    // -------------------------------------------------------------------------
+
+    public function test_cursor_yields_all_items(): void
+    {
+        $mock   = new MockHandler([
+            new Response(200, [], json_encode(['result' => [$this->customerPayload('c1'), $this->customerPayload('c2', 'K-101')]])),
+            // Second page returns fewer items than pageSize → no more pages
+            new Response(200, [], json_encode(['result' => [$this->customerPayload('c3', 'K-102')]])),
+        ]);
+        $guzzle = new GuzzleClient(['handler' => HandlerStack::create($mock), 'http_errors' => false]);
+        $client = new WeclappClient(
+            new WeclappConfig(tenant: 'test', token: 'test-token', maxRetries: 0),
+            guzzle: $guzzle,
+        );
+
+        $ids = [];
+        foreach ($client->customers()->cursor(\miralsoft\weclapp\api\Query\QueryBuilder::new()->pageSize(2)) as $customer) {
+            $ids[] = $customer->id;
+        }
+
+        self::assertSame(['c1', 'c2', 'c3'], $ids);
+    }
+
+    // -------------------------------------------------------------------------
+    // PSR-16 cache
+    // -------------------------------------------------------------------------
+
+    public function test_list_all_uses_cache_on_hit(): void
+    {
+        $cachedData = [$this->customerPayload('cached-1')];
+        $dtos       = array_map(
+            fn (array $p) => CustomerDTO::fromArray($p),
+            $cachedData
+        );
+
+        $cache = new class($dtos) implements \Psr\SimpleCache\CacheInterface {
+            public function __construct(private readonly array $data) {}
+
+            public function has(string $key): bool { return true; }
+            public function get(string $key, mixed $default = null): mixed { return $this->data; }
+            public function set(string $key, mixed $value, \DateInterval|int|null $ttl = null): bool { return true; }
+            public function delete(string $key): bool { return true; }
+            public function clear(): bool { return true; }
+            public function getMultiple(iterable $keys, mixed $default = null): iterable { return []; }
+            public function setMultiple(iterable $values, \DateInterval|int|null $ttl = null): bool { return true; }
+            public function deleteMultiple(iterable $keys): bool { return true; }
+        };
+
+        // No HTTP responses queued — if it hits the network this test would fail
+        $mock   = new MockHandler([]);
+        $guzzle = new GuzzleClient(['handler' => HandlerStack::create($mock), 'http_errors' => false]);
+        $client = new WeclappClient(
+            new WeclappConfig(tenant: 'test', token: 'test-token', maxRetries: 0),
+            cache: $cache,
+            guzzle: $guzzle,
+        );
+
+        $result = $client->customers()->listAll();
+
+        self::assertCount(1, $result);
+        self::assertSame('cached-1', $result[0]->id);
+    }
+
+    public function test_list_all_stores_result_in_cache(): void
+    {
+        $stored = [];
+        $cache  = new class($stored) implements \Psr\SimpleCache\CacheInterface {
+            public array $stored = [];
+
+            public function has(string $key): bool { return false; }
+            public function get(string $key, mixed $default = null): mixed { return $default; }
+            public function set(string $key, mixed $value, \DateInterval|int|null $ttl = null): bool {
+                $this->stored[$key] = $value;
+                return true;
+            }
+            public function delete(string $key): bool { return true; }
+            public function clear(): bool { return true; }
+            public function getMultiple(iterable $keys, mixed $default = null): iterable { return []; }
+            public function setMultiple(iterable $values, \DateInterval|int|null $ttl = null): bool { return true; }
+            public function deleteMultiple(iterable $keys): bool { return true; }
+        };
+
+        $mock   = new MockHandler([
+            new Response(200, [], json_encode(['result' => [$this->customerPayload()]])),
+        ]);
+        $guzzle = new GuzzleClient(['handler' => HandlerStack::create($mock), 'http_errors' => false]);
+        $client = new WeclappClient(
+            new WeclappConfig(tenant: 'test', token: 'test-token', maxRetries: 0),
+            cache: $cache,
+            guzzle: $guzzle,
+        );
+
+        $client->customers()->listAll();
+
+        self::assertNotEmpty($cache->stored);
     }
 }

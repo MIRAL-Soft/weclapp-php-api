@@ -25,6 +25,13 @@ use ReflectionProperty;
 abstract class AbstractDTO
 {
     /**
+     * Per-class reflection property cache to avoid repeated ReflectionClass instantiation.
+     *
+     * @var array<class-string, list<ReflectionProperty>>
+     */
+    private static array $propertyCache = [];
+
+    /**
      * Create a DTO instance from a raw API response array.
      *
      * @param array<string, mixed> $data Raw decoded JSON from the weclapp API.
@@ -42,10 +49,16 @@ abstract class AbstractDTO
      */
     public function toArray(): array
     {
-        $result     = [];
-        $reflection = new ReflectionClass($this);
+        $class = static::class;
 
-        foreach ($reflection->getProperties(ReflectionProperty::IS_PUBLIC) as $property) {
+        if (!isset(self::$propertyCache[$class])) {
+            self::$propertyCache[$class] = (new ReflectionClass($this))
+                ->getProperties(ReflectionProperty::IS_PUBLIC);
+        }
+
+        $result = [];
+
+        foreach (self::$propertyCache[$class] as $property) {
             $value = $property->getValue($this);
 
             $result[$property->getName()] = match (true) {
@@ -174,8 +187,8 @@ abstract class AbstractDTO
             return null;
         }
 
-        $epochSeconds = (int) $data[$key] / 1000;
+        $epochSeconds = (int) ($data[$key] / 1000);
 
-        return DateTimeImmutable::createFromFormat('U', (string) (int) $epochSeconds) ?: null;
+        return DateTimeImmutable::createFromFormat('U', (string) $epochSeconds) ?: null;
     }
 }
