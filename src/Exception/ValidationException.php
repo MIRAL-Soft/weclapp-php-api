@@ -32,10 +32,16 @@ class ValidationException extends WeclappApiException
      */
     public function withErrors(array $errors): static
     {
-        $clone         = clone $this;
-        $clone->errors = $errors;
+        $new         = new static(
+            message:      $this->getMessage(),
+            statusCode:   $this->getStatusCode(),
+            requestUrl:   $this->getRequestUrl(),
+            responseBody: $this->getResponseBody(),
+            previous:     $this->getPrevious(),
+        );
+        $new->errors = $errors;
 
-        return $clone;
+        return $new;
     }
 
     /**

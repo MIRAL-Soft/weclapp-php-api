@@ -320,11 +320,8 @@ abstract class AbstractResource
      */
     public function cursor(?QueryBuilder $query = null): \Generator
     {
-        $page     = 1;
-        $pageSize = 100;
-
-        $q = clone ($query ?? QueryBuilder::new());
-        $q->pageSize($pageSize);
+        $page = 1;
+        $q    = clone ($query ?? QueryBuilder::new()->pageSize(100));
 
         do {
             $q->page($page);
