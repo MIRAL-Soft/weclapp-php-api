@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace miralsoft\weclapp\api\Resource;
 
+use miralsoft\weclapp\api\DTO\PartyDTO;
 use miralsoft\weclapp\api\DTO\SalesInvoiceDTO;
 use miralsoft\weclapp\api\Exception\WeclappApiException;
 use miralsoft\weclapp\api\Query\QueryBuilder;
@@ -18,6 +19,9 @@ class SalesInvoiceResource extends AbstractResource
     protected string $endpoint = 'salesInvoice';
     protected string $dtoClass = SalesInvoiceDTO::class;
 
+    /** @var array<string, PartyDTO> In-memory cache: partyId → PartyDTO */
+    private array $partyCache = [];
+
     /**
      * Download the PDF for the given sales invoice.
      *
@@ -30,9 +34,74 @@ class SalesInvoiceResource extends AbstractResource
     {
         return $this->rateLimiter->execute(
             fn () => $this->http->getBinary(
-                $this->endpoint . '/' . $id . '/downloadLatestSalesInvoicePdf'
+                $this->endpoint . '/id/' . $id . '/downloadLatestSalesInvoicePdf'
             )
         );
+    }
+
+    /**
+     * Resolve the customer display name for the given invoice.
+     *
+     * Handles the ORGANIZATION vs. PERSON distinction correctly:
+     * - ORGANIZATION → company name
+     * - PERSON       → "First Last"
+     *
+     * Resolution order:
+     * 1. Inline customerName from the invoice (if the API returned it).
+     * 2. party/id/{partyId} lookup via the weclapp party endpoint.
+     * 3. Inline customerNumber as a last resort.
+     * 4. 'Unknown' if nothing is available.
+     *
+     * Party lookups are cached in memory for the lifetime of this resource
+     * instance, so processing multiple invoices for the same customer only
+     * triggers one API call.
+     *
+     * @throws WeclappApiException
+     *
+     * @example
+     * foreach ($client->salesInvoices()->findOpen() as $invoice) {
+     *     $name = $client->salesInvoices()->resolveCustomerDisplayName($invoice);
+     *     echo $invoice->invoiceNumber . ' — ' . $name;
+     * }
+     */
+    public function resolveCustomerDisplayName(SalesInvoiceDTO $invoice): string
+    {
+        if ($invoice->customerName !== null) {
+            return $invoice->customerName;
+        }
+
+        if ($invoice->partyId !== null) {
+            $party = $this->fetchParty($invoice->partyId);
+            if ($party !== null) {
+                return $party->getDisplayName();
+            }
+        }
+
+        return $invoice->customerNumber ?? 'Unknown';
+    }
+
+    /**
+     * Fetch a PartyDTO by ID, using the in-memory cache.
+     *
+     * @throws WeclappApiException
+     */
+    private function fetchParty(string $partyId): ?PartyDTO
+    {
+        if (isset($this->partyCache[$partyId])) {
+            return $this->partyCache[$partyId];
+        }
+
+        try {
+            $data  = $this->rateLimiter->execute(
+                fn () => $this->http->get('party/id/' . $partyId)
+            );
+            $party = PartyDTO::fromArray($data);
+            $this->partyCache[$partyId] = $party;
+
+            return $party;
+        } catch (WeclappApiException) {
+            return null;
+        }
     }
 
     /**

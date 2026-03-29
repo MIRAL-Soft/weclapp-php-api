@@ -31,7 +31,7 @@ class SalesOrderResource extends AbstractResource
     {
         return $this->rateLimiter->execute(
             fn () => $this->http->getBinary(
-                $this->endpoint . '/' . $id . '/downloadLatestOrderConfirmationPdf'
+                $this->endpoint . '/id/' . $id . '/downloadLatestOrderConfirmationPdf'
             )
         );
     }

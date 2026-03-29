@@ -112,6 +112,7 @@ $config = WeclappConfig::fromArray([
 | `$client->salesOrders()` | `/salesOrder` | Sales orders + PDF download |
 | `$client->salesInvoices()` | `/salesInvoice` | Sales invoices + PDF download |
 | `$client->quotations()` | `/quotation` | Quotations + PDF + order conversion |
+| `$client->parties()` | `/party` | Party identity lookup (resolves partyId to name/number) |
 | `$client->webhooks()` | `/webhook` | Event-driven webhook subscriptions |
 
 ---
@@ -266,11 +267,15 @@ $changed = $client->customers()->findModifiedSince(
 $customers = $client->customers();
 
 // Convenience lookups
-$customer  = $customers->findByCustomerNumber('K-10042');
-$results   = $customers->findByCompany('Acme');      // case-insensitive search
-$results   = $customers->findByEmail('info@acme.de');
+$customer = $customers->findByCustomerNumber('K-10042');
+$results  = $customers->findByCompany('Acme');       // case-insensitive search
+$results  = $customers->findByEmail('info@acme.de');
 
-// Display name (company name or "First Last")
+// Search by name — works for both ORGANIZATION (company name) and PERSON (last name)
+$results  = $customers->findByName('Smith');
+// → matches "Smith Ltd." (company) and "John Smith" (person)
+
+// Display name (company name for ORGANIZATION, "First Last" for PERSON)
 echo $customer->getDisplayName();
 ```
 
@@ -354,6 +359,35 @@ echo $invoice->isOpen() ? 'Unpaid' : 'Paid';
 // Download invoice PDF
 $pdf = $invoices->getPdf($invoiceId);
 file_put_contents('invoice.pdf', $pdf);
+
+// Resolve the customer display name correctly for ORGANIZATION and PERSON types.
+// The weclapp API does not return a top-level customerName field on invoices,
+// so a party/id/{partyId} lookup is performed automatically when needed.
+// Results are cached in memory — multiple invoices for the same customer
+// produce only one additional API call.
+foreach ($invoices->findOpen() as $invoice) {
+    $name = $invoices->resolveCustomerDisplayName($invoice);
+    // → "Acme Ltd." for an organisation, "John Smith" for a private customer
+    echo $invoice->invoiceNumber . ' — ' . $name . PHP_EOL;
+}
+
+// Quick inline fallback (no extra API call — uses only inline invoice data)
+echo $invoice->getCustomerDisplayName();
+// → customerName (if returned) → customerNumber → 'Unknown'
+```
+
+### Parties
+
+The `party` endpoint is the common base entity for customers, suppliers and contacts.
+Use it to resolve a `partyId` reference (e.g. from a sales invoice) to identity data
+without loading the full customer or supplier payload.
+
+```php
+$party = $client->parties()->find($invoice->partyId);
+
+echo $party->customerNumber;   // e.g. "K-10042"
+echo $party->getDisplayName(); // company name or "First Last"
+echo $party->partyType;        // "ORGANIZATION" or "PERSON"
 ```
 
 ### Quotations
@@ -690,6 +724,30 @@ All API responses are returned as typed, immutable DTOs.
 | `netAmount`, `grossAmount` | `?float` |
 | `currency` | `?string` |
 | `orderItems` / `invoiceItems` / `quotationItems` | `array` |
+
+#### Additional fields on `SalesInvoiceDTO`
+
+| Field | Type | Description |
+|---|---|---|
+| `partyId` | `?string` | ID of the underlying party record — use with `$client->parties()->find()` |
+| `customerNumber` | `?string` | Human-readable customer number (e.g. `K-10042`) |
+| `customerName` | `?string` | Denormalised display name — not always returned by the API |
+| `getCustomerDisplayName()` | `string` | Best available inline name: `customerName` → `customerNumber` → `'Unknown'` |
+
+> To get a fully resolved display name that correctly handles ORGANIZATION vs. PERSON,
+> use `SalesInvoiceResource::resolveCustomerDisplayName($invoice)` instead.
+
+### PartyDTO
+
+| Field | Type | Description |
+|---|---|---|
+| `id` | `string` | Internal weclapp UUID |
+| `partyType` | `string` | `ORGANIZATION` or `PERSON` |
+| `customerNumber` | `?string` | Human-readable customer number |
+| `company` | `?string` | Company name (ORGANIZATION) |
+| `firstName`, `lastName` | `?string` | Person name fields (PERSON) |
+| `email` | `?string` | Primary e-mail address |
+| `getDisplayName()` | `string` | Company name or "First Last" depending on `partyType` |
 
 ---
 

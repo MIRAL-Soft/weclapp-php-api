@@ -24,7 +24,9 @@ final class SalesInvoiceDTO extends AbstractDTO
      * @param string       $invoiceNumber      Human-readable invoice number (e.g. "RE-10042").
      * @param string       $status             Invoice status (e.g. "INVOICE_DRAFT", "INVOICE_SENT").
      * @param string       $customerId         ID of the linked customer.
-     * @param string|null  $customerName       Customer display name (denormalised).
+     * @param string|null  $customerNumber     Human-readable customer number (e.g. "K-10042").
+     * @param string|null  $partyId            ID of the underlying party record (use with party endpoint).
+     * @param string|null  $customerName       Customer display name (denormalised, not always returned by API).
      * @param int          $invoiceDate        Invoice date in epoch milliseconds.
      * @param int|null     $dueDate            Payment due date in epoch milliseconds.
      * @param string|null  $paymentMethodId    ID of the assigned payment method.
@@ -45,6 +47,8 @@ final class SalesInvoiceDTO extends AbstractDTO
         public readonly string  $invoiceNumber,
         public readonly string  $status,
         public readonly string  $customerId,
+        public readonly ?string $customerNumber,
+        public readonly ?string $partyId,
         public readonly ?string $customerName,
         public readonly int     $invoiceDate,
         public readonly ?int    $dueDate,
@@ -74,6 +78,8 @@ final class SalesInvoiceDTO extends AbstractDTO
             invoiceNumber:    self::str($data, 'invoiceNumber'),
             status:           self::str($data, 'status'),
             customerId:       self::str($data, 'customerId'),
+            customerNumber:   self::strOrNull($data, 'customerNumber'),
+            partyId:          self::strOrNull($data, 'partyId'),
             customerName:     self::strOrNull($data, 'customerName'),
             invoiceDate:      self::int($data, 'invoiceDate'),
             dueDate:          self::intOrNull($data, 'dueDate'),
@@ -123,6 +129,24 @@ final class SalesInvoiceDTO extends AbstractDTO
         }
 
         return self::dateFromEpochMs(['dueDate' => $this->dueDate], 'dueDate');
+    }
+
+    /**
+     * Returns the best available customer display name from inline invoice data.
+     *
+     * Uses the denormalised customerName field if the API returned it.
+     * Falls back to the customerNumber, then to 'Unknown'.
+     *
+     * Note: This method cannot distinguish between ORGANIZATION and PERSON types
+     * because the invoice payload does not carry name details. To get a properly
+     * resolved display name (company name vs. first/last name), use
+     * SalesInvoiceResource::resolveCustomerDisplayName() instead.
+     */
+    public function getCustomerDisplayName(): string
+    {
+        return $this->customerName
+            ?? $this->customerNumber
+            ?? 'Unknown';
     }
 
     /**

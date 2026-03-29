@@ -32,7 +32,7 @@ class QuotationResource extends AbstractResource
     {
         return $this->rateLimiter->execute(
             fn () => $this->http->getBinary(
-                $this->endpoint . '/' . $id . '/downloadLatestQuotationPdf'
+                $this->endpoint . '/id/' . $id . '/downloadLatestQuotationPdf'
             )
         );
     }

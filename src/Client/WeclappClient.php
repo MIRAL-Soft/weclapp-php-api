@@ -10,6 +10,7 @@ use miralsoft\weclapp\api\Resource\ArticleCategoryResource;
 use miralsoft\weclapp\api\Resource\ArticleResource;
 use miralsoft\weclapp\api\Resource\ContactResource;
 use miralsoft\weclapp\api\Resource\CustomerResource;
+use miralsoft\weclapp\api\Resource\PartyResource;
 use miralsoft\weclapp\api\Resource\QuotationResource;
 use miralsoft\weclapp\api\Resource\SalesInvoiceResource;
 use miralsoft\weclapp\api\Resource\SalesOrderResource;
@@ -75,6 +76,24 @@ final class WeclappClient
     ) {
         $this->http        = new HttpClient($config, $guzzle, $logger);
         $this->rateLimiter = new RateLimiter($config->getMaxRetries());
+    }
+
+    /**
+     * Returns the Party resource for resolving partyId references.
+     *
+     * The party endpoint is the common base entity for customers, suppliers
+     * and contacts. Use this to resolve a partyId (e.g. from a salesInvoice)
+     * to its customer number and display name without loading the full record.
+     *
+     * Endpoint: /api/v2/party
+     *
+     * @example Resolve a partyId from an invoice:
+     * $party = $client->parties()->find($invoice->partyId);
+     * echo $party->customerNumber; // e.g. "K-10042"
+     */
+    public function parties(): PartyResource
+    {
+        return new PartyResource($this->http, $this->rateLimiter, $this->cache);
     }
 
     /**

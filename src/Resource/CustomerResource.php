@@ -78,6 +78,41 @@ class CustomerResource extends AbstractResource
     }
 
     /**
+     * Find customers by display name, regardless of whether they are an
+     * ORGANIZATION (company name) or a PERSON (first/last name).
+     *
+     * Searches the company field first. If no results are found, a second
+     * search is performed against the lastName field so that partial names
+     * like "Smith" match both "John Smith" and "Smith Ltd.".
+     *
+     * @return list<CustomerDTO>
+     *
+     * @throws WeclappApiException
+     */
+    public function findByName(string $name): array
+    {
+        $byCompany = $this->list(
+            QueryBuilder::new()
+                ->filterIlike('company', $name)
+                ->sort('company')
+        );
+
+        if (!empty($byCompany->items)) {
+            /** @var list<CustomerDTO> */
+            return $byCompany->items;
+        }
+
+        $byPerson = $this->list(
+            QueryBuilder::new()
+                ->filterIlike('lastName', $name)
+                ->sort('lastName')
+        );
+
+        /** @var list<CustomerDTO> */
+        return $byPerson->items;
+    }
+
+    /**
      * Find customers by e-mail address (exact match).
      *
      * @return list<CustomerDTO>

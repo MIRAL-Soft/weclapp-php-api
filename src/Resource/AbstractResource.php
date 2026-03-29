@@ -85,7 +85,7 @@ abstract class AbstractResource
     public function find(string $id): AbstractDTO
     {
         $data = $this->rateLimiter->execute(
-            fn () => $this->http->get($this->endpoint . '/' . $id)
+            fn () => $this->http->get($this->endpoint . '/id/' . $id)
         );
 
         return ($this->dtoClass)::fromArray($data);
@@ -205,7 +205,7 @@ abstract class AbstractResource
     public function update(string $id, array $data): AbstractDTO
     {
         $response = $this->rateLimiter->execute(
-            fn () => $this->http->put($this->endpoint . '/' . $id, $data)
+            fn () => $this->http->put($this->endpoint . '/id/' . $id, $data)
         );
 
         return ($this->dtoClass)::fromArray($response);
@@ -222,7 +222,7 @@ abstract class AbstractResource
     public function delete(string $id): void
     {
         $this->rateLimiter->execute(
-            fn () => $this->http->delete($this->endpoint . '/' . $id)
+            fn () => $this->http->delete($this->endpoint . '/id/' . $id)
         );
     }
 
