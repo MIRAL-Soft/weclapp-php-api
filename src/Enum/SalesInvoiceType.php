@@ -8,25 +8,25 @@ namespace miralsoft\weclapp\api\Enum;
  * Invoice type values for weclapp Sales Invoices.
  *
  * The type determines what kind of billing document a salesInvoice record
- * represents. Credit notes (Stornorechnungen) are identified by CreditNote.
+ * represents. Cancellation invoices are identified by CreditNote.
  *
- * To fetch only credit notes via the API, filter by this type:
+ * To fetch only cancellation invoices via the API, filter by this type:
  *   GET /salesInvoice?salesInvoiceType-eq=CREDIT_NOTE
  * Or use SalesInvoiceResource::findCreditNotes().
  *
  * @example
  * if (SalesInvoiceType::tryFrom($invoice->salesInvoiceType) === SalesInvoiceType::CreditNote) {
- *     // This is a Stornorechnung — download with getPdf() as usual
+ *     // This is a cancellation invoice — download with getPdf() as usual
  *     $pdf = $client->salesInvoices()->getPdf($invoice->id);
  * }
  */
 enum SalesInvoiceType: string
 {
-    /** Partial advance payment invoice (Anzahlungsrechnung). */
+    /** Advance payment invoice — partial payment before goods/services are delivered. */
     case AdvancePaymentInvoice = 'ADVANCE_PAYMENT_INVOICE';
 
     /**
-     * Credit note / Stornorechnung (CLX-number range).
+     * Cancellation invoice / credit note (CLX-number range).
      *
      * Created when an existing invoice is cancelled. The original invoice
      * receives status CANCELLED and its cancellationNumber field is set to
@@ -36,18 +36,18 @@ enum SalesInvoiceType: string
      */
     case CreditNote = 'CREDIT_NOTE';
 
-    /** Final invoice after advance payments (Schlussrechnung). */
+    /** Final invoice settling all prior advance payments. */
     case FinalInvoice = 'FINAL_INVOICE';
 
-    /** Partial payment invoice (Teilzahlungsrechnung). */
+    /** Partial payment invoice — covers a portion of the total amount. */
     case PartPaymentInvoice = 'PART_PAYMENT_INVOICE';
 
-    /** Prepayment invoice (Vorauszahlungsrechnung). */
+    /** Prepayment invoice — requests full payment before delivery. */
     case PrepaymentInvoice = 'PREPAYMENT_INVOICE';
 
     /** Retail / point-of-sale invoice. */
     case RetailInvoice = 'RETAIL_INVOICE';
 
-    /** Standard sales invoice (Standardrechnung, RE-number range). */
+    /** Standard sales invoice (RE-number range). */
     case StandardInvoice = 'STANDARD_INVOICE';
 }

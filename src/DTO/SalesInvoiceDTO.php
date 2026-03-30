@@ -12,10 +12,10 @@ use DateTimeImmutable;
  * Sales invoices map to the /api/v2/salesInvoice endpoint.
  * PDF downloads are available via SalesInvoiceResource::getPdf().
  *
- * This DTO covers all invoice types, including Stornorechnungen (credit notes).
+ * This DTO covers all invoice types, including cancellation invoices (credit notes).
  * Use the salesInvoiceType field to distinguish between types:
  *   - STANDARD_INVOICE → regular invoice (RE-number range)
- *   - CREDIT_NOTE      → Stornorechnung (CLX-number range)
+ *   - CREDIT_NOTE      → cancellation invoice (CLX-number range)
  *
  * To fetch only credit notes use SalesInvoiceResource::findCreditNotes().
  *
@@ -33,7 +33,7 @@ final class SalesInvoiceDTO extends AbstractDTO
      * @param string       $invoiceNumber            Human-readable invoice number (e.g. "RE-10042" or "CLX-1061").
      * @param string       $status                   Invoice status. See SalesInvoiceStatus enum.
      * @param string       $salesInvoiceType         Invoice type. See SalesInvoiceType enum.
-     *                                               CREDIT_NOTE identifies a Stornorechnung (CLX-number range).
+     *                                               CREDIT_NOTE identifies a cancellation invoice (CLX-number range).
      * @param string       $customerId               ID of the linked customer.
      * @param string|null  $customerNumber           Human-readable customer number (e.g. "K-10042").
      * @param string|null  $partyId                  ID of the underlying party record (use with party endpoint).
@@ -174,14 +174,14 @@ final class SalesInvoiceDTO extends AbstractDTO
     }
 
     /**
-     * Returns true if this invoice is a credit note (Stornorechnung).
+     * Returns true if this invoice is a cancellation invoice (credit note).
      *
-     * Credit notes carry a CLX-prefixed invoiceNumber and have their
+     * Cancellation invoices carry a CLX-prefixed invoiceNumber and have their
      * precedingSalesInvoiceId set to the ID of the original invoice.
      *
      * @example
      * if ($invoice->isCreditNote()) {
-     *     echo 'Stornorechnung: ' . $invoice->invoiceNumber;
+     *     echo 'Cancellation invoice: ' . $invoice->invoiceNumber;
      * }
      */
     public function isCreditNote(): bool

@@ -28,7 +28,7 @@ enum SalesInvoiceStatus: string
     /** Invoice document has been generated. */
     case DocumentCreated = 'DOCUMENT_CREATED';
 
-    /** Invoice has been transferred to the open-item list (Offene-Posten-Liste). */
+    /** Invoice has been transferred to the open-item list (accounts receivable). */
     case OpenItemCreated = 'OPEN_ITEM_CREATED';
 
     /** Invoice has been fully completed and booked. */

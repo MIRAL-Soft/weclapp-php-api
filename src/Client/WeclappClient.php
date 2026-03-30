@@ -10,6 +10,7 @@ use miralsoft\weclapp\api\Resource\ArticleCategoryResource;
 use miralsoft\weclapp\api\Resource\ArticleResource;
 use miralsoft\weclapp\api\Resource\ContactResource;
 use miralsoft\weclapp\api\Resource\CustomerResource;
+use miralsoft\weclapp\api\Resource\DocumentResource;
 use miralsoft\weclapp\api\Resource\PartyResource;
 use miralsoft\weclapp\api\Resource\QuotationResource;
 use miralsoft\weclapp\api\Resource\SalesInvoiceResource;
@@ -168,6 +169,26 @@ final class WeclappClient
     public function salesOrders(): SalesOrderResource
     {
         return new SalesOrderResource($this->http, $this->rateLimiter, $this->cache);
+    }
+
+    /**
+     * Returns the Document resource for querying, downloading and uploading attachments.
+     *
+     * Documents are files attached to weclapp entities (invoices, orders, customers, etc.).
+     * They are not embedded in those entities — use findByEntity() to query them.
+     *
+     * Endpoint: /api/v2/document
+     *
+     * @example Find and download the cancellation invoice PDF:
+     * $pdf = $client->documents()->downloadCancellationInvoice($invoiceId);
+     * file_put_contents('CLX-1061.pdf', $pdf);
+     *
+     * @example List all documents attached to an invoice:
+     * $docs = $client->documents()->findByEntity($invoiceId, 'salesInvoice');
+     */
+    public function documents(): DocumentResource
+    {
+        return new DocumentResource($this->http, $this->rateLimiter, $this->cache);
     }
 
     /**

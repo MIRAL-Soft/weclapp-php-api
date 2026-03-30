@@ -110,6 +110,7 @@ $config = WeclappConfig::fromArray([
 | `$client->articles()` | `/article` | Products / articles |
 | `$client->articleCategories()` | `/articleCategory` | Article category tree |
 | `$client->salesOrders()` | `/salesOrder` | Sales orders + PDF download |
+| `$client->documents()` | `/document` | File attachments on any entity — query, download, upload |
 | `$client->salesInvoices()` | `/salesInvoice` | Sales invoices + PDF download |
 | `$client->quotations()` | `/quotation` | Quotations + PDF + order conversion |
 | `$client->parties()` | `/party` | Party identity lookup (resolves partyId to name/number) |
@@ -376,39 +377,110 @@ echo $invoice->getCustomerDisplayName();
 // → customerName (if returned) → customerNumber → 'Unknown'
 ```
 
-### Stornorechnungen (Credit Notes)
+### Documents
 
-Stornorechnungen sind **keine eigene API-Ressource** — sie werden über denselben
-`/salesInvoice`-Endpoint abgerufen und durch `salesInvoiceType = CREDIT_NOTE` identifiziert.
+Documents are file attachments that belong to weclapp entities (invoices, orders, customers, etc.).
+They are **not** embedded inside those entities — they must be queried separately using `entityId` + `entityName`.
 
 ```php
-$invoices = $client->salesInvoices();
+$docs = $client->documents();
 
-// Alle Stornorechnungen herunterladen (CLX-Nummernkreis)
-$creditNotes = $invoices->findCreditNotes();
-
-foreach ($creditNotes as $note) {
-    echo $note->invoiceNumber;            // z.B. "CLX-1061"
-    echo $note->precedingSalesInvoiceId; // UUID der stornierten Originalrechnung
-    echo $note->isCreditNote();          // true
-
-    // PDF herunterladen — funktioniert identisch zu normalen Rechnungen
-    $pdf = $invoices->getPdf($note->id);
-    file_put_contents($note->invoiceNumber . '.pdf', $pdf);
+// List all documents attached to an invoice
+$attachments = $docs->findByEntity($invoiceId, 'salesInvoice');
+foreach ($attachments as $doc) {
+    echo $doc->documentType . ' — ' . $doc->name . ' (' . $doc->documentSize . ' bytes)' . PHP_EOL;
 }
 
-// Delta-Sync: nur neue/geänderte Stornorechnungen seit letztem Lauf
-$changed = $invoices->findCreditNotesModifiedSince($lastSyncMs);
+// Filter by document type
+use miralsoft\weclapp\api\Enum\DocumentType;
 
-// Zusammenhang Original ↔ Storno:
-// Auf der stornierten Originalrechnung (RE-xxxx):
-//   $invoice->status             → 'CANCELLED'
-//   $invoice->cancellationNumber → 'CLX-1061'  (die zugehörige Stornorechnung)
-//
-// Auf der Stornorechnung (CLX-xxxx):
-//   $note->salesInvoiceType         → 'CREDIT_NOTE'
-//   $note->precedingSalesInvoiceId  → UUID der Originalrechnung
+$cancellationDocs = $docs->findByEntityAndType(
+    $invoiceId, 'salesInvoice', DocumentType::SalesInvoiceCancellation
+);
+
+// Fetch a single document by ID (ID format: "salesInvoice.926104.926166")
+$doc = $docs->find('salesInvoice.926104.926166');
+
+// Download the binary content of a document (ID is URL-encoded automatically)
+$pdf = $docs->download($doc->id);
+file_put_contents($doc->getFileName(), $pdf);
+
+// Upload a new document and attach it to an entity
+$pdfBytes = file_get_contents('/path/to/file.pdf');
+$newDoc = $docs->upload(
+    entityId:    $invoiceId,
+    entityName:  'salesInvoice',
+    name:        'manually-added.pdf',
+    binary:      $pdfBytes,
+    type:        DocumentType::SalesInvoice,
+    contentType: 'application/pdf',
+);
+
+// Upload a new version of an existing document
+$updatedDoc = $docs->uploadVersion(
+    id:          $doc->id,
+    binary:      $pdfBytes,
+    comment:     'Corrected amount',
+    contentType: 'application/pdf',
+);
+
+// Update document metadata (name, type, description)
+$updated = $docs->update($doc->id, [
+    'name'         => 'renamed.pdf',
+    'documentType' => DocumentType::SalesInvoiceDefault->value,
+    'description'  => 'Manually renamed',
+]);
+
+// Delete a document
+$docs->delete($doc->id);
 ```
+
+### Cancellation Invoices (Credit Notes)
+
+Cancellation invoices are **not** separate `salesInvoice` records in weclapp.
+They exist as a **document attachment** (`SALES_INVOICE_CANCELLATION`) on the original cancelled invoice.
+The document filename contains the CLX-number (e.g. `Storno-CLX1061-R-RE26767-Kdnr-12070.pdf` — weclapp-generated).
+
+```php
+// Recommended approach: via salesInvoices() — encapsulates the document lookup internally
+$invoices = $client->salesInvoices();
+
+// Fetch all cancelled invoices
+$cancelled = $invoices->listAll(
+    QueryBuilder::new()->filterEq('status', 'CANCELLED')
+);
+
+foreach ($cancelled as $invoice) {
+    // cancellationNumber holds the CLX-number, e.g. "CLX-1061"
+    if ($invoice->cancellationNumber === null) {
+        continue;
+    }
+
+    // Download the cancellation invoice PDF (automatically finds the SALES_INVOICE_CANCELLATION document)
+    $pdf = $invoices->getCancellationPdf($invoice->id);
+
+    if ($pdf !== null) {
+        file_put_contents($invoice->cancellationNumber . '.pdf', $pdf);
+    }
+}
+
+// Alternative: directly via the document endpoint for more control
+$doc = $client->documents()->findCancellationDocument($invoiceId);
+if ($doc !== null) {
+    echo $doc->name;         // weclapp-generated filename, e.g. "Storno-CLX1061-R-RE26767-Kdnr-12070.pdf"
+    echo $doc->documentSize; // file size in bytes
+    $pdf = $client->documents()->download($doc->id);
+}
+```
+
+**Relationship between original invoice and cancellation:**
+
+| Field | On | Value |
+|---|---|---|
+| `status` | Original invoice | `CANCELLED` |
+| `cancellationNumber` | Original invoice | CLX-number, e.g. `CLX-1061` |
+| `documentType` | Document attachment | `SALES_INVOICE_CANCELLATION` |
+| `name` | Document attachment | Filename including CLX-number (weclapp-generated) |
 
 ### Parties
 
@@ -648,35 +720,35 @@ $client->webhooks()->register(
 
 ### `SalesInvoiceStatus`
 
-| Case | API-Wert | Bedeutung |
+| Case | API value | Description |
 |---|---|---|
-| `New` | `NEW` | Erstellt, noch nicht verarbeitet |
-| `DocumentCreated` | `DOCUMENT_CREATED` | Rechnungsdokument wurde erzeugt |
-| `OpenItemCreated` | `OPEN_ITEM_CREATED` | In die Offene-Posten-Liste gebucht |
-| `EntryCompleted` | `ENTRY_COMPLETED` | Vollständig abgeschlossen |
-| `Cancelled` | `CANCELLED` | Storniert (Stornorechnung wurde erzeugt) |
+| `New` | `NEW` | Created, not yet processed |
+| `DocumentCreated` | `DOCUMENT_CREATED` | Invoice document has been generated |
+| `OpenItemCreated` | `OPEN_ITEM_CREATED` | Posted to the accounts receivable open-item list |
+| `EntryCompleted` | `ENTRY_COMPLETED` | Fully completed and booked |
+| `Cancelled` | `CANCELLED` | Cancelled — a cancellation invoice was created |
 
 ### `SalesInvoiceType`
 
-| Case | API-Wert | Beschreibung |
+| Case | API value | Description |
 |---|---|---|
-| `StandardInvoice` | `STANDARD_INVOICE` | Normale Rechnung (RE-Nummernkreis) |
-| `CreditNote` | `CREDIT_NOTE` | **Stornorechnung** (CLX-Nummernkreis) |
-| `AdvancePaymentInvoice` | `ADVANCE_PAYMENT_INVOICE` | Anzahlungsrechnung |
-| `FinalInvoice` | `FINAL_INVOICE` | Schlussrechnung |
-| `PartPaymentInvoice` | `PART_PAYMENT_INVOICE` | Teilzahlungsrechnung |
-| `PrepaymentInvoice` | `PREPAYMENT_INVOICE` | Vorauszahlungsrechnung |
-| `RetailInvoice` | `RETAIL_INVOICE` | Kassenbeleg |
+| `StandardInvoice` | `STANDARD_INVOICE` | Regular invoice (RE-number range) |
+| `CreditNote` | `CREDIT_NOTE` | **Cancellation invoice** (CLX-number range) |
+| `AdvancePaymentInvoice` | `ADVANCE_PAYMENT_INVOICE` | Advance payment invoice |
+| `FinalInvoice` | `FINAL_INVOICE` | Final invoice settling prior advance payments |
+| `PartPaymentInvoice` | `PART_PAYMENT_INVOICE` | Partial payment invoice |
+| `PrepaymentInvoice` | `PREPAYMENT_INVOICE` | Prepayment invoice |
+| `RetailInvoice` | `RETAIL_INVOICE` | Retail / point-of-sale invoice |
 
 ```php
-// Prüfen ob eine Rechnung eine Stornorechnung ist
+// Check if an invoice is a cancellation invoice
 if (SalesInvoiceType::tryFrom($invoice->salesInvoiceType) === SalesInvoiceType::CreditNote) {
-    echo 'Stornorechnung: ' . $invoice->invoiceNumber;
+    echo 'Cancellation invoice: ' . $invoice->invoiceNumber;
 }
 
-// Kurzform über die DTO-Hilfsmethode
+// Shorthand via the DTO helper method
 if ($invoice->isCreditNote()) {
-    echo 'Stornorechnung: ' . $invoice->invoiceNumber;
+    echo 'Cancellation invoice: ' . $invoice->invoiceNumber;
 }
 ```
 
@@ -798,7 +870,7 @@ All API responses are returned as typed, immutable DTOs.
 
 | Field | Type | Description |
 |---|---|---|
-| `salesInvoiceType` | `string` | Invoice type — see `SalesInvoiceType` enum. `CREDIT_NOTE` = Stornorechnung |
+| `salesInvoiceType` | `string` | Invoice type — see `SalesInvoiceType` enum. `CREDIT_NOTE` = cancellation invoice |
 | `precedingSalesInvoiceId` | `?string` | For `CREDIT_NOTE`: UUID of the original cancelled invoice |
 | `cancellationNumber` | `?string` | For cancelled invoices: CLX-number of the associated credit note |
 | `paid` | `bool` | `true` if the invoice has been fully paid |

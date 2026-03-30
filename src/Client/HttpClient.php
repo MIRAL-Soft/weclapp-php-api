@@ -141,6 +141,64 @@ final class HttpClient
     }
 
     /**
+     * Perform a POST request with a raw binary body (for document uploads).
+     *
+     * Unlike post() which JSON-encodes the body, this method sends the raw bytes
+     * as-is and sets the Content-Type to the provided mime type.
+     * Used by DocumentResource to upload new documents or new document versions.
+     *
+     * @param string $path        API endpoint path, e.g. "document/upload".
+     * @param string $queryString URL query string including leading "?".
+     * @param string $binary      Raw binary content to upload (e.g. PDF bytes).
+     * @param string $contentType MIME type of the uploaded file. Default: application/octet-stream.
+     *
+     * @return array<string, mixed> Decoded JSON response.
+     *
+     * @throws WeclappApiException On any API or network error.
+     */
+    public function postUpload(
+        string $path,
+        string $queryString,
+        string $binary,
+        string $contentType = 'application/octet-stream',
+    ): array {
+        $url     = $this->buildUrl($path, $queryString);
+        $start   = hrtime(true);
+
+        $this->logger->debug('[weclapp] POST (upload) {path}', ['path' => $path]);
+
+        try {
+            $response = $this->guzzle->request('POST', $url, [
+                'body'    => $binary,
+                'headers' => ['Content-Type' => $contentType],
+            ]);
+
+            $statusCode = $response->getStatusCode();
+            $body       = (string) $response->getBody();
+            $headers    = $this->extractHeaders($response);
+
+            $this->logger->debug(
+                '[weclapp] {status} POST {path} ({elapsed}ms)',
+                ['status' => $statusCode, 'path' => $path, 'elapsed' => $this->elapsed($start)],
+            );
+
+            return ResponseParser::parse($statusCode, $body, $url, $headers);
+        } catch (ConnectException $e) {
+            $this->logger->error('[weclapp] Connection failed: {message}', ['message' => $e->getMessage()]);
+            throw new WeclappApiException(
+                'Connection to weclapp failed: ' . $e->getMessage(),
+                0,
+                $url,
+            );
+        } catch (RequestException $e) {
+            $this->logger->error('[weclapp] Request failed: {message}', ['message' => $e->getMessage()]);
+            $this->handleRequestException($e, $url);
+        }
+
+        return [];
+    }
+
+    /**
      * Perform a DELETE request.
      *
      * @param string $path API endpoint path including the resource ID, e.g. "customer/123".

@@ -4,16 +4,21 @@ declare(strict_types=1);
 
 namespace miralsoft\weclapp\api\Resource;
 
+use miralsoft\weclapp\api\Client\HttpClient;
+use miralsoft\weclapp\api\Client\RateLimiter;
 use miralsoft\weclapp\api\DTO\PartyDTO;
 use miralsoft\weclapp\api\DTO\SalesInvoiceDTO;
 use miralsoft\weclapp\api\Enum\SalesInvoiceType;
 use miralsoft\weclapp\api\Exception\WeclappApiException;
 use miralsoft\weclapp\api\Query\QueryBuilder;
+use Psr\SimpleCache\CacheInterface;
 
 /**
  * Resource class for weclapp Sales Invoice operations.
  *
  * Wraps the /api/v2/salesInvoice endpoint.
+ * Includes convenience methods for downloading cancellation invoice PDFs (credit notes)
+ * via the /document endpoint.
  */
 class SalesInvoiceResource extends AbstractResource
 {
@@ -22,6 +27,17 @@ class SalesInvoiceResource extends AbstractResource
 
     /** @var array<string, PartyDTO> In-memory cache: partyId → PartyDTO */
     private array $partyCache = [];
+
+    private readonly DocumentResource $documentResource;
+
+    public function __construct(
+        HttpClient $http,
+        RateLimiter $rateLimiter,
+        ?CacheInterface $cache = null,
+    ) {
+        parent::__construct($http, $rateLimiter, $cache);
+        $this->documentResource = new DocumentResource($http, $rateLimiter, $cache);
+    }
 
     /**
      * Download the PDF for the given sales invoice.
@@ -106,7 +122,7 @@ class SalesInvoiceResource extends AbstractResource
     }
 
     /**
-     * Find all credit notes (Stornorechnungen) across all customers.
+     * Find all credit notes across all customers.
      *
      * Credit notes are identified by salesInvoiceType = CREDIT_NOTE and carry
      * a CLX-prefixed invoiceNumber. Each credit note references its original
@@ -134,7 +150,7 @@ class SalesInvoiceResource extends AbstractResource
     }
 
     /**
-     * Find all credit notes (Stornorechnungen) modified since a given point in time.
+     * Find all credit notes modified since a given point in time.
      *
      * Convenience method for delta-sync of credit notes only.
      *
@@ -220,6 +236,41 @@ class SalesInvoiceResource extends AbstractResource
     {
         /** @var SalesInvoiceDTO */
         return parent::update($id, $data);
+    }
+
+    /**
+     * Download the cancellation invoice PDF for a cancelled sales invoice.
+     *
+     * Retrieves the SALES_INVOICE_CANCELLATION document attached to the invoice
+     * and returns its binary PDF content.
+     *
+     * Returns null if no cancellation document is attached — this is the case
+     * for invoices that are not cancelled, or where the cancellation was processed
+     * outside weclapp.
+     *
+     * Typical usage:
+     *   1. Fetch all invoices with status CANCELLED.
+     *   2. For each, call getCancellationPdf() to download the cancellation document.
+     *
+     * @param string $salesInvoiceId The weclapp UUID of the original (cancelled) sales invoice.
+     * @return string|null Raw binary PDF content, or null if no cancellation document exists.
+     *
+     * @throws WeclappApiException
+     *
+     * @example
+     * $invoices = $client->salesInvoices()->listAll(
+     *     QueryBuilder::new()->filterEq('status', 'CANCELLED')
+     * );
+     * foreach ($invoices as $invoice) {
+     *     $pdf = $client->salesInvoices()->getCancellationPdf($invoice->id);
+     *     if ($pdf !== null) {
+     *         file_put_contents($invoice->cancellationNumber . '.pdf', $pdf);
+     *     }
+     * }
+     */
+    public function getCancellationPdf(string $salesInvoiceId): ?string
+    {
+        return $this->documentResource->downloadCancellationInvoice($salesInvoiceId);
     }
 
     /**
