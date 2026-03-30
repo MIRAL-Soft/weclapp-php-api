@@ -376,6 +376,40 @@ echo $invoice->getCustomerDisplayName();
 // → customerName (if returned) → customerNumber → 'Unknown'
 ```
 
+### Stornorechnungen (Credit Notes)
+
+Stornorechnungen sind **keine eigene API-Ressource** — sie werden über denselben
+`/salesInvoice`-Endpoint abgerufen und durch `salesInvoiceType = CREDIT_NOTE` identifiziert.
+
+```php
+$invoices = $client->salesInvoices();
+
+// Alle Stornorechnungen herunterladen (CLX-Nummernkreis)
+$creditNotes = $invoices->findCreditNotes();
+
+foreach ($creditNotes as $note) {
+    echo $note->invoiceNumber;            // z.B. "CLX-1061"
+    echo $note->precedingSalesInvoiceId; // UUID der stornierten Originalrechnung
+    echo $note->isCreditNote();          // true
+
+    // PDF herunterladen — funktioniert identisch zu normalen Rechnungen
+    $pdf = $invoices->getPdf($note->id);
+    file_put_contents($note->invoiceNumber . '.pdf', $pdf);
+}
+
+// Delta-Sync: nur neue/geänderte Stornorechnungen seit letztem Lauf
+$changed = $invoices->findCreditNotesModifiedSince($lastSyncMs);
+
+// Zusammenhang Original ↔ Storno:
+// Auf der stornierten Originalrechnung (RE-xxxx):
+//   $invoice->status             → 'CANCELLED'
+//   $invoice->cancellationNumber → 'CLX-1061'  (die zugehörige Stornorechnung)
+//
+// Auf der Stornorechnung (CLX-xxxx):
+//   $note->salesInvoiceType         → 'CREDIT_NOTE'
+//   $note->precedingSalesInvoiceId  → UUID der Originalrechnung
+```
+
 ### Parties
 
 The `party` endpoint is the common base entity for customers, suppliers and contacts.
@@ -591,6 +625,7 @@ Use the provided enums to avoid magic string comparisons:
 ```php
 use miralsoft\weclapp\api\Enum\SalesOrderStatus;
 use miralsoft\weclapp\api\Enum\SalesInvoiceStatus;
+use miralsoft\weclapp\api\Enum\SalesInvoiceType;
 use miralsoft\weclapp\api\Enum\QuotationStatus;
 use miralsoft\weclapp\api\Enum\WebhookEventType;
 
@@ -609,6 +644,40 @@ $client->webhooks()->register(
     eventType:   WebhookEventType::PartyUpdated->value,
     callbackUrl: 'https://my-app.example.com/webhooks/weclapp',
 );
+```
+
+### `SalesInvoiceStatus`
+
+| Case | API-Wert | Bedeutung |
+|---|---|---|
+| `New` | `NEW` | Erstellt, noch nicht verarbeitet |
+| `DocumentCreated` | `DOCUMENT_CREATED` | Rechnungsdokument wurde erzeugt |
+| `OpenItemCreated` | `OPEN_ITEM_CREATED` | In die Offene-Posten-Liste gebucht |
+| `EntryCompleted` | `ENTRY_COMPLETED` | Vollständig abgeschlossen |
+| `Cancelled` | `CANCELLED` | Storniert (Stornorechnung wurde erzeugt) |
+
+### `SalesInvoiceType`
+
+| Case | API-Wert | Beschreibung |
+|---|---|---|
+| `StandardInvoice` | `STANDARD_INVOICE` | Normale Rechnung (RE-Nummernkreis) |
+| `CreditNote` | `CREDIT_NOTE` | **Stornorechnung** (CLX-Nummernkreis) |
+| `AdvancePaymentInvoice` | `ADVANCE_PAYMENT_INVOICE` | Anzahlungsrechnung |
+| `FinalInvoice` | `FINAL_INVOICE` | Schlussrechnung |
+| `PartPaymentInvoice` | `PART_PAYMENT_INVOICE` | Teilzahlungsrechnung |
+| `PrepaymentInvoice` | `PREPAYMENT_INVOICE` | Vorauszahlungsrechnung |
+| `RetailInvoice` | `RETAIL_INVOICE` | Kassenbeleg |
+
+```php
+// Prüfen ob eine Rechnung eine Stornorechnung ist
+if (SalesInvoiceType::tryFrom($invoice->salesInvoiceType) === SalesInvoiceType::CreditNote) {
+    echo 'Stornorechnung: ' . $invoice->invoiceNumber;
+}
+
+// Kurzform über die DTO-Hilfsmethode
+if ($invoice->isCreditNote()) {
+    echo 'Stornorechnung: ' . $invoice->invoiceNumber;
+}
 ```
 
 ---
@@ -729,9 +798,17 @@ All API responses are returned as typed, immutable DTOs.
 
 | Field | Type | Description |
 |---|---|---|
+| `salesInvoiceType` | `string` | Invoice type — see `SalesInvoiceType` enum. `CREDIT_NOTE` = Stornorechnung |
+| `precedingSalesInvoiceId` | `?string` | For `CREDIT_NOTE`: UUID of the original cancelled invoice |
+| `cancellationNumber` | `?string` | For cancelled invoices: CLX-number of the associated credit note |
+| `paid` | `bool` | `true` if the invoice has been fully paid |
+| `paymentStatus` | `?string` | e.g. `OPEN`, `PAID`, `CLEARED_WITH_CREDIT_NOTE` |
+| `bookingDate` | `?int` | Accounting booking date (epoch ms) |
 | `partyId` | `?string` | ID of the underlying party record — use with `$client->parties()->find()` |
 | `customerNumber` | `?string` | Human-readable customer number (e.g. `K-10042`) |
 | `customerName` | `?string` | Denormalised display name — not always returned by the API |
+| `isCreditNote()` | `bool` | `true` if `salesInvoiceType === 'CREDIT_NOTE'` |
+| `getBookingDate()` | `?DateTimeImmutable` | Booking date as object |
 | `getCustomerDisplayName()` | `string` | Best available inline name: `customerName` → `customerNumber` → `'Unknown'` |
 
 > To get a fully resolved display name that correctly handles ORGANIZATION vs. PERSON,

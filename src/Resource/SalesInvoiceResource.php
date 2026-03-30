@@ -6,6 +6,7 @@ namespace miralsoft\weclapp\api\Resource;
 
 use miralsoft\weclapp\api\DTO\PartyDTO;
 use miralsoft\weclapp\api\DTO\SalesInvoiceDTO;
+use miralsoft\weclapp\api\Enum\SalesInvoiceType;
 use miralsoft\weclapp\api\Exception\WeclappApiException;
 use miralsoft\weclapp\api\Query\QueryBuilder;
 
@@ -102,6 +103,53 @@ class SalesInvoiceResource extends AbstractResource
         } catch (WeclappApiException) {
             return null;
         }
+    }
+
+    /**
+     * Find all credit notes (Stornorechnungen) across all customers.
+     *
+     * Credit notes are identified by salesInvoiceType = CREDIT_NOTE and carry
+     * a CLX-prefixed invoiceNumber. Each credit note references its original
+     * invoice via the precedingSalesInvoiceId field.
+     *
+     * @return list<SalesInvoiceDTO>
+     *
+     * @throws WeclappApiException
+     *
+     * @example
+     * $creditNotes = $client->salesInvoices()->findCreditNotes();
+     * foreach ($creditNotes as $note) {
+     *     $pdf = $client->salesInvoices()->getPdf($note->id);
+     *     file_put_contents($note->invoiceNumber . '.pdf', $pdf);
+     * }
+     */
+    public function findCreditNotes(?QueryBuilder $extra = null): array
+    {
+        $q = clone ($extra ?? QueryBuilder::new());
+        $q->filterEq('salesInvoiceType', SalesInvoiceType::CreditNote->value)
+          ->sortByCreated('desc');
+
+        /** @var list<SalesInvoiceDTO> */
+        return $this->listAll($q);
+    }
+
+    /**
+     * Find all credit notes (Stornorechnungen) modified since a given point in time.
+     *
+     * Convenience method for delta-sync of credit notes only.
+     *
+     * @param \DateTimeInterface|int $since A DateTime object or epoch milliseconds.
+     * @return list<SalesInvoiceDTO>
+     *
+     * @throws WeclappApiException
+     */
+    public function findCreditNotesModifiedSince(\DateTimeInterface|int $since): array
+    {
+        $q = QueryBuilder::new()
+            ->filterEq('salesInvoiceType', SalesInvoiceType::CreditNote->value);
+
+        /** @var list<SalesInvoiceDTO> */
+        return parent::findModifiedSince($since, $q);
     }
 
     /**
