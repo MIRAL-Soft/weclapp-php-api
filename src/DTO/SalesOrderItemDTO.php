@@ -66,12 +66,12 @@ final class SalesOrderItemDTO extends AbstractDTO
      * @param int|null     $plannedWorkingTimePerUnit              Planned working time per unit in minutes.
      * @param string|null  $contractChargeId                      ID of the related contract charge (readOnly).
      * @param string|null  $serviceQuotaId                        ID of the related service quota (readOnly).
-     * @param list<array>  $commissionSalesPartners               Commission assignments for sales partners.
-     * @param list<array>  $ecommerceOrderItemIds                 Linked e-commerce order item IDs.
-     * @param list<array>  $picks                                 Linked warehouse picks.
-     * @param list<array>  $tasks                                 Linked tasks (readOnly).
-     * @param list<array>  $reductionAdditionItems                Surcharge / discount sub-items.
-     * @param list<array>  $customAttributes                      Custom attribute values.
+     * @param list<CommissionSalesPartnerDTO> $commissionSalesPartners Commission assignments for sales partners.
+     * @param list<array>                     $ecommerceOrderItemIds   Linked e-commerce order item IDs (raw string IDs).
+     * @param list<ItemPickDTO>               $picks                   Linked warehouse picks.
+     * @param list<array>                     $tasks                   Linked tasks (readOnly, raw onlyId objects).
+     * @param list<ReductionAdditionItemDTO>  $reductionAdditionItems  Surcharge / discount sub-items.
+     * @param list<CustomAttributeDTO>        $customAttributes        Custom attribute values.
      */
     public function __construct(
         // Identity
@@ -137,7 +137,7 @@ final class SalesOrderItemDTO extends AbstractDTO
         public readonly ?string $contractChargeId,
         public readonly ?string $serviceQuotaId,
 
-        // Nested arrays
+        // Nested typed arrays
         public readonly array   $commissionSalesPartners,
         public readonly array   $ecommerceOrderItemIds,
         public readonly array   $picks,
@@ -208,12 +208,24 @@ final class SalesOrderItemDTO extends AbstractDTO
             contractChargeId:                        self::strOrNull($data, 'contractChargeId'),
             serviceQuotaId:                          self::strOrNull($data, 'serviceQuotaId'),
 
-            commissionSalesPartners:                 self::arr($data, 'commissionSalesPartners'),
+            commissionSalesPartners:                 array_map(
+                static fn(array $item) => CommissionSalesPartnerDTO::fromArray($item),
+                self::arr($data, 'commissionSalesPartners'),
+            ),
             ecommerceOrderItemIds:                   self::arr($data, 'ecommerceOrderItemIds'),
-            picks:                                   self::arr($data, 'picks'),
+            picks:                                   array_map(
+                static fn(array $item) => ItemPickDTO::fromArray($item),
+                self::arr($data, 'picks'),
+            ),
             tasks:                                   self::arr($data, 'tasks'),
-            reductionAdditionItems:                  self::arr($data, 'reductionAdditionItems'),
-            customAttributes:                        self::arr($data, 'customAttributes'),
+            reductionAdditionItems:                  array_map(
+                static fn(array $item) => ReductionAdditionItemDTO::fromArray($item),
+                self::arr($data, 'reductionAdditionItems'),
+            ),
+            customAttributes:                        array_map(
+                static fn(array $item) => CustomAttributeDTO::fromArray($item),
+                self::arr($data, 'customAttributes'),
+            ),
         );
     }
 

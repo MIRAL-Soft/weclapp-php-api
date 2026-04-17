@@ -61,12 +61,12 @@ final class SalesInvoiceItemDTO extends AbstractDTO
      * @param int|null     $servicePeriodTo                       Service period end date in epoch milliseconds.
      * @param int|null     $deliveryDate                          Delivery date for this line item in epoch milliseconds.
      * @param int|null     $shippingDate                          Shipping date for this line item in epoch milliseconds.
-     * @param list<array>  $commissionSalesPartners               Commission assignments for sales partners.
-     * @param list<array>  $costCenterItems                       Cost centre allocations.
-     * @param list<array>  $reductionAdditionItems                Surcharge / discount sub-items.
-     * @param list<array>  $salesInvoiceItemRelationships         Related invoice item links (readOnly).
-     * @param list<array>  $serialNumbers                         Serial numbers assigned to this item (readOnly).
-     * @param list<array>  $customAttributes                      Custom attribute values.
+     * @param list<CommissionSalesPartnerDTO>          $commissionSalesPartners         Commission assignments for sales partners.
+     * @param list<CostCenterWithDistributionPercentageDTO> $costCenterItems             Cost centre allocations.
+     * @param list<ReductionAdditionItemDTO>           $reductionAdditionItems          Surcharge / discount sub-items.
+     * @param list<SalesInvoiceItemRelationshipDTO>    $salesInvoiceItemRelationships   Related invoice item links (readOnly).
+     * @param list<array>                              $serialNumbers                   Serial numbers assigned to this item (raw).
+     * @param list<CustomAttributeDTO>                 $customAttributes                Custom attribute values.
      */
     public function __construct(
         // Identity
@@ -128,7 +128,7 @@ final class SalesInvoiceItemDTO extends AbstractDTO
         public readonly ?int    $deliveryDate,
         public readonly ?int    $shippingDate,
 
-        // Nested arrays
+        // Nested typed arrays
         public readonly array   $commissionSalesPartners,
         public readonly array   $costCenterItems,
         public readonly array   $reductionAdditionItems,
@@ -195,12 +195,27 @@ final class SalesInvoiceItemDTO extends AbstractDTO
             deliveryDate:                            self::intOrNull($data, 'deliveryDate'),
             shippingDate:                            self::intOrNull($data, 'shippingDate'),
 
-            commissionSalesPartners:                 self::arr($data, 'commissionSalesPartners'),
-            costCenterItems:                         self::arr($data, 'costCenterItems'),
-            reductionAdditionItems:                  self::arr($data, 'reductionAdditionItems'),
-            salesInvoiceItemRelationships:           self::arr($data, 'salesInvoiceItemRelationships'),
+            commissionSalesPartners:                 array_map(
+                static fn(array $item) => CommissionSalesPartnerDTO::fromArray($item),
+                self::arr($data, 'commissionSalesPartners'),
+            ),
+            costCenterItems:                         array_map(
+                static fn(array $item) => CostCenterWithDistributionPercentageDTO::fromArray($item),
+                self::arr($data, 'costCenterItems'),
+            ),
+            reductionAdditionItems:                  array_map(
+                static fn(array $item) => ReductionAdditionItemDTO::fromArray($item),
+                self::arr($data, 'reductionAdditionItems'),
+            ),
+            salesInvoiceItemRelationships:           array_map(
+                static fn(array $item) => SalesInvoiceItemRelationshipDTO::fromArray($item),
+                self::arr($data, 'salesInvoiceItemRelationships'),
+            ),
             serialNumbers:                           self::arr($data, 'serialNumbers'),
-            customAttributes:                        self::arr($data, 'customAttributes'),
+            customAttributes:                        array_map(
+                static fn(array $item) => CustomAttributeDTO::fromArray($item),
+                self::arr($data, 'customAttributes'),
+            ),
         );
     }
 
