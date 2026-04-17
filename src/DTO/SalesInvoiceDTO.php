@@ -20,42 +20,43 @@ use DateTimeImmutable;
  * To fetch only credit notes use SalesInvoiceResource::findCreditNotes().
  *
  * @see \miralsoft\weclapp\api\Resource\SalesInvoiceResource
+ * @see \miralsoft\weclapp\api\DTO\SalesInvoiceItemDTO
  * @see \miralsoft\weclapp\api\Enum\SalesInvoiceType
  * @see \miralsoft\weclapp\api\Enum\SalesInvoiceStatus
  */
 final class SalesInvoiceDTO extends AbstractDTO
 {
     /**
-     * @param string       $id                       Internal weclapp UUID.
-     * @param string       $version                  Optimistic locking version string.
-     * @param int          $createdDate              Creation timestamp in epoch milliseconds.
-     * @param int          $lastModifiedDate         Last modification timestamp in epoch milliseconds.
-     * @param string       $invoiceNumber            Human-readable invoice number (e.g. "RE-10042" or "CLX-1061").
-     * @param string       $status                   Invoice status. See SalesInvoiceStatus enum.
-     * @param string       $salesInvoiceType         Invoice type. See SalesInvoiceType enum.
-     *                                               CREDIT_NOTE identifies a cancellation invoice (CLX-number range).
-     * @param string       $customerId               ID of the linked customer.
-     * @param string|null  $customerNumber           Human-readable customer number (e.g. "K-10042").
-     * @param string|null  $partyId                  ID of the underlying party record (use with party endpoint).
-     * @param string|null  $customerName             Customer display name (denormalised, not always returned by API).
-     * @param int          $invoiceDate              Invoice date in epoch milliseconds.
-     * @param int|null     $dueDate                  Payment due date in epoch milliseconds.
-     * @param int|null     $bookingDate              Accounting booking date in epoch milliseconds.
-     * @param string|null  $paymentMethodId          ID of the assigned payment method.
-     * @param string|null  $paymentStatus            Payment status (e.g. "OPEN", "PAID", "CLEARED_WITH_CREDIT_NOTE").
-     * @param bool         $paid                     True if the invoice has been fully paid.
-     * @param float|null   $netAmount                Net invoice amount.
-     * @param float|null   $grossAmount              Gross invoice amount (including tax).
-     * @param float|null   $openAmount               Remaining unpaid amount.
-     * @param string|null  $currency                 Currency code (e.g. "EUR").
-     * @param string|null  $salesOrderId             ID of the originating sales order (if any).
-     * @param string|null  $precedingSalesInvoiceId  For CREDIT_NOTE: ID of the original invoice being cancelled.
-     *                                               Null for regular invoices.
-     * @param string|null  $cancellationNumber       For cancelled invoices: the CLX-number of the credit note
-     *                                               that was created. Null if not cancelled.
-     * @param list<array>  $invoiceItems             Line items of this invoice.
-     * @param list<array>  $tags                     List of tag objects.
-     * @param list<array>  $customAttributes         List of custom attribute objects.
+     * @param string                      $id                       Internal weclapp UUID.
+     * @param string                      $version                  Optimistic locking version string.
+     * @param int                         $createdDate              Creation timestamp in epoch milliseconds.
+     * @param int                         $lastModifiedDate         Last modification timestamp in epoch milliseconds.
+     * @param string                      $invoiceNumber            Human-readable invoice number (e.g. "RE-10042" or "CLX-1061").
+     * @param string                      $status                   Invoice status. See SalesInvoiceStatus enum.
+     * @param string                      $salesInvoiceType         Invoice type. See SalesInvoiceType enum.
+     *                                                              CREDIT_NOTE identifies a cancellation invoice (CLX-number range).
+     * @param string                      $customerId               ID of the linked customer.
+     * @param string|null                 $customerNumber           Human-readable customer number (e.g. "K-10042").
+     * @param string|null                 $partyId                  ID of the underlying party record (use with party endpoint).
+     * @param string|null                 $customerName             Customer display name (denormalised, not always returned by API).
+     * @param int                         $invoiceDate              Invoice date in epoch milliseconds.
+     * @param int|null                    $dueDate                  Payment due date in epoch milliseconds.
+     * @param int|null                    $bookingDate              Accounting booking date in epoch milliseconds.
+     * @param string|null                 $paymentMethodId          ID of the assigned payment method.
+     * @param string|null                 $paymentStatus            Payment status (e.g. "OPEN", "PAID", "CLEARED_WITH_CREDIT_NOTE").
+     * @param bool                        $paid                     True if the invoice has been fully paid.
+     * @param float|null                  $netAmount                Net invoice amount.
+     * @param float|null                  $grossAmount              Gross invoice amount (including tax).
+     * @param float|null                  $openAmount               Remaining unpaid amount.
+     * @param string|null                 $currency                 Currency code (e.g. "EUR").
+     * @param string|null                 $salesOrderId             ID of the originating sales order (if any).
+     * @param string|null                 $precedingSalesInvoiceId  For CREDIT_NOTE: ID of the original invoice being cancelled.
+     *                                                              Null for regular invoices.
+     * @param string|null                 $cancellationNumber       For cancelled invoices: the CLX-number of the credit note
+     *                                                              that was created. Null if not cancelled.
+     * @param list<SalesInvoiceItemDTO>   $salesInvoiceItems        Typed line items of this invoice.
+     * @param list<array>                 $tags                     List of tag objects.
+     * @param list<array>                 $customAttributes         List of custom attribute objects.
      */
     public function __construct(
         public readonly string  $id,
@@ -82,7 +83,7 @@ final class SalesInvoiceDTO extends AbstractDTO
         public readonly ?string $salesOrderId,
         public readonly ?string $precedingSalesInvoiceId,
         public readonly ?string $cancellationNumber,
-        public readonly array   $invoiceItems,
+        public readonly array   $salesInvoiceItems,
         public readonly array   $tags,
         public readonly array   $customAttributes,
     ) {}
@@ -119,7 +120,10 @@ final class SalesInvoiceDTO extends AbstractDTO
             salesOrderId:            self::strOrNull($data, 'salesOrderId'),
             precedingSalesInvoiceId: self::strOrNull($data, 'precedingSalesInvoiceId'),
             cancellationNumber:      self::strOrNull($data, 'cancellationNumber'),
-            invoiceItems:            self::arr($data, 'salesInvoiceItems'),
+            salesInvoiceItems:       array_map(
+                static fn(array $item) => SalesInvoiceItemDTO::fromArray($item),
+                self::arr($data, 'salesInvoiceItems'),
+            ),
             tags:                    self::arr($data, 'tags'),
             customAttributes:        self::arr($data, 'customAttributes'),
         );

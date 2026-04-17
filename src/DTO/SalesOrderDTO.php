@@ -13,32 +13,33 @@ use DateTimeImmutable;
  * PDF downloads are available via SalesOrderResource::getPdf().
  *
  * @see \miralsoft\weclapp\api\Resource\SalesOrderResource
+ * @see \miralsoft\weclapp\api\DTO\SalesOrderItemDTO
  */
 final class SalesOrderDTO extends AbstractDTO
 {
     /**
-     * @param string       $id                    Internal weclapp UUID.
-     * @param string       $version               Optimistic locking version string.
-     * @param int          $createdDate           Creation timestamp in epoch milliseconds.
-     * @param int          $lastModifiedDate      Last modification timestamp in epoch milliseconds.
-     * @param string       $orderNumber           Human-readable order number (e.g. "SO-10042").
-     * @param string       $status                Order status (e.g. "ORDER_ENTRY_IN_PROGRESS", "ORDER_CONFIRMED").
-     * @param string       $customerId            ID of the linked customer.
-     * @param string|null  $customerNumber        Customer number for reference.
-     * @param string|null  $customerName          Customer display name (denormalised).
-     * @param string|null  $customerOrderNumber   Customer's own order reference number.
-     * @param int          $orderDate             Order date in epoch milliseconds.
-     * @param int|null     $deliveryDate          Requested delivery date in epoch milliseconds.
-     * @param int|null     $shippingDate          Actual shipping date in epoch milliseconds.
-     * @param string|null  $description           Internal description / comment.
-     * @param float|null   $netAmount             Net order amount.
-     * @param float|null   $grossAmount           Gross order amount (including tax).
-     * @param string|null  $currency              Currency code (e.g. "EUR").
-     * @param string|null  $salesChannel          Assigned sales channel.
-     * @param string|null  $responsibleUserId     ID of the responsible weclapp user.
-     * @param list<array>  $orderItems            Line items of this order.
-     * @param list<array>  $tags                  List of tag objects.
-     * @param list<array>  $customAttributes      List of custom attribute objects.
+     * @param string                   $id                  Internal weclapp UUID.
+     * @param string                   $version             Optimistic locking version string.
+     * @param int                      $createdDate         Creation timestamp in epoch milliseconds.
+     * @param int                      $lastModifiedDate    Last modification timestamp in epoch milliseconds.
+     * @param string                   $orderNumber         Human-readable order number (e.g. "SO-10042").
+     * @param string                   $status              Order status (e.g. "ORDER_ENTRY_IN_PROGRESS", "ORDER_CONFIRMED").
+     * @param string                   $customerId          ID of the linked customer.
+     * @param string|null              $customerNumber      Customer number for reference.
+     * @param string|null              $customerName        Customer display name (denormalised).
+     * @param string|null              $customerOrderNumber Customer's own order reference number.
+     * @param int                      $orderDate           Order date in epoch milliseconds.
+     * @param int|null                 $deliveryDate        Requested delivery date in epoch milliseconds.
+     * @param int|null                 $shippingDate        Actual shipping date in epoch milliseconds.
+     * @param string|null              $description         Internal description / comment.
+     * @param float|null               $netAmount           Net order amount.
+     * @param float|null               $grossAmount         Gross order amount (including tax).
+     * @param string|null              $currency            Currency code (e.g. "EUR").
+     * @param string|null              $salesChannel        Assigned sales channel.
+     * @param string|null              $responsibleUserId   ID of the responsible weclapp user.
+     * @param list<SalesOrderItemDTO>  $orderItems          Typed line items of this order.
+     * @param list<array>              $tags                List of tag objects.
+     * @param list<array>              $customAttributes    List of custom attribute objects.
      */
     public function __construct(
         public readonly string  $id,
@@ -92,7 +93,10 @@ final class SalesOrderDTO extends AbstractDTO
             currency:             self::strOrNull($data, 'currency'),
             salesChannel:         self::strOrNull($data, 'salesChannel'),
             responsibleUserId:    self::strOrNull($data, 'responsibleUserId'),
-            orderItems:           self::arr($data, 'orderItems'),
+            orderItems:           array_map(
+                static fn(array $item) => SalesOrderItemDTO::fromArray($item),
+                self::arr($data, 'orderItems'),
+            ),
             tags:                 self::arr($data, 'tags'),
             customAttributes:     self::arr($data, 'customAttributes'),
         );
@@ -132,5 +136,17 @@ final class SalesOrderDTO extends AbstractDTO
         }
 
         return self::dateFromEpochMs(['deliveryDate' => $this->deliveryDate], 'deliveryDate');
+    }
+
+    /**
+     * Returns the shipping date as a DateTimeImmutable object.
+     */
+    public function getShippingDate(): ?DateTimeImmutable
+    {
+        if ($this->shippingDate === null) {
+            return null;
+        }
+
+        return self::dateFromEpochMs(['shippingDate' => $this->shippingDate], 'shippingDate');
     }
 }
