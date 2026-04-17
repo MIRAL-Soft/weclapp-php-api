@@ -345,6 +345,17 @@ file_put_contents('order-confirmation.pdf', $pdf);
 // Date helpers
 echo $order->getOrderDate()?->format('d.m.Y');
 echo $order->getDeliveryDate()?->format('d.m.Y');
+echo $order->getShippingDate()?->format('d.m.Y');
+
+// Line items — orderItems is a typed list<SalesOrderItemDTO>
+foreach ($order->orderItems as $item) {
+    echo $item->positionNumber . '. ' . $item->title . PHP_EOL;
+    echo '   Article ID : ' . $item->articleId . PHP_EOL;
+    echo '   Qty        : ' . $item->getQuantity() . ' (unit: ' . $item->unitId . ')' . PHP_EOL;
+    echo '   Unit price : ' . $item->getUnitPrice() . PHP_EOL;
+    echo '   Net amount : ' . $item->getNetAmount() . PHP_EOL;
+    echo '   Shipped    : ' . ($item->shipped ? 'yes' : 'no') . PHP_EOL;
+}
 ```
 
 ### Sales Invoices
@@ -375,6 +386,17 @@ foreach ($invoices->findOpen() as $invoice) {
 // Quick inline fallback (no extra API call — uses only inline invoice data)
 echo $invoice->getCustomerDisplayName();
 // → customerName (if returned) → customerNumber → 'Unknown'
+
+// Line items — salesInvoiceItems is a typed list<SalesInvoiceItemDTO>
+foreach ($invoice->salesInvoiceItems as $item) {
+    echo $item->positionNumber . '. ' . $item->title . PHP_EOL;
+    echo '   Net amount : ' . $item->getNetAmount() . PHP_EOL;
+    echo '   Tax ID     : ' . $item->taxId . PHP_EOL;
+
+    if ($item->isCreditNoteItem()) {
+        echo '   Cancels item: ' . $item->creditedInvoiceItemId . PHP_EOL;
+    }
+}
 ```
 
 ### Documents
@@ -698,6 +720,8 @@ Use the provided enums to avoid magic string comparisons:
 use miralsoft\weclapp\api\Enum\SalesOrderStatus;
 use miralsoft\weclapp\api\Enum\SalesInvoiceStatus;
 use miralsoft\weclapp\api\Enum\SalesInvoiceType;
+use miralsoft\weclapp\api\Enum\ItemType;
+use miralsoft\weclapp\api\Enum\InvoicingType;
 use miralsoft\weclapp\api\Enum\QuotationStatus;
 use miralsoft\weclapp\api\Enum\WebhookEventType;
 
@@ -750,7 +774,34 @@ if (SalesInvoiceType::tryFrom($invoice->salesInvoiceType) === SalesInvoiceType::
 if ($invoice->isCreditNote()) {
     echo 'Cancellation invoice: ' . $invoice->invoiceNumber;
 }
+
+// Filter by item type on a sales order
+foreach ($order->orderItems as $item) {
+    if (ItemType::tryFrom($item->itemType) === ItemType::Service) {
+        echo 'Service: ' . $item->title . ' (' . $item->invoicingType . ')' . PHP_EOL;
+    }
+}
 ```
+
+### `ItemType`
+
+Applies to `SalesOrderItemDTO::$itemType` and `SalesInvoiceItemDTO::$itemType`.
+
+| Case | API value | Description |
+|---|---|---|
+| `Default` | `DEFAULT` | Standard article line item |
+| `FreeText` | `FREE_TEXT` | Free-text position with no article reference |
+| `Service` | `SERVICE` | Service item billed by effort or fixed price |
+| `ServiceQuota` | `SERVICE_QUOTA` | Service item linked to a service quota |
+
+### `InvoicingType`
+
+Applies to `SalesOrderItemDTO::$invoicingType` (service items only).
+
+| Case | API value | Description |
+|---|---|---|
+| `Effort` | `EFFORT` | Billed based on actual recorded effort (time tracking) |
+| `FixedPrice` | `FIXED_PRICE` | Billed at a pre-agreed fixed price regardless of effort |
 
 ---
 
@@ -855,36 +906,175 @@ All API responses are returned as typed, immutable DTOs.
 | `articleCategoryId`, `unit` | `?string` |
 | `isInStock()` | `bool` |
 
-### SalesOrderDTO / SalesInvoiceDTO / QuotationDTO
-
-| Field | Type |
-|---|---|
-| `orderNumber` / `invoiceNumber` / `quotationNumber` | `string` |
-| `status` | `string` |
-| `customerId` | `string` |
-| `netAmount`, `grossAmount` | `?float` |
-| `currency` | `?string` |
-| `orderItems` / `invoiceItems` / `quotationItems` | `array` |
-
-#### Additional fields on `SalesInvoiceDTO`
+### SalesOrderDTO
 
 | Field | Type | Description |
 |---|---|---|
+| `orderNumber` | `string` | Human-readable order number (e.g. `SO-10042`) |
+| `status` | `string` | Order status — see `SalesOrderStatus` enum |
+| `customerId` | `string` | ID of the linked customer |
+| `customerNumber` | `?string` | Human-readable customer number |
+| `customerName` | `?string` | Denormalised display name |
+| `customerOrderNumber` | `?string` | Customer's own reference number |
+| `orderDate` | `int` | Order date (epoch ms) |
+| `deliveryDate` | `?int` | Requested delivery date (epoch ms) |
+| `shippingDate` | `?int` | Actual shipping date (epoch ms) |
+| `netAmount`, `grossAmount` | `?float` | Net / gross order amount |
+| `currency` | `?string` | Currency code (e.g. `EUR`) |
+| `salesChannel` | `?string` | Assigned sales channel |
+| `responsibleUserId` | `?string` | ID of the responsible weclapp user |
+| `orderItems` | `list<SalesOrderItemDTO>` | Typed line items — see `SalesOrderItemDTO` |
+| `tags`, `customAttributes` | `array` | Tag and custom attribute objects |
+| `getOrderDate()` | `?DateTimeImmutable` | Order date as object |
+| `getDeliveryDate()` | `?DateTimeImmutable` | Delivery date as object |
+| `getShippingDate()` | `?DateTimeImmutable` | Shipping date as object |
+
+### SalesOrderItemDTO
+
+Embedded in `SalesOrderDTO::$orderItems`. Maps the `salesOrderItem` schema.
+
+| Field | Type | Description |
+|---|---|---|
+| `articleId` | `?string` | ID of the linked article (null for FREE\_TEXT items) |
+| `title` | `?string` | Line item title / article name |
+| `description` | `?string` | HTML description |
+| `quantity` | `?string` | Ordered quantity (decimal string) |
+| `unitId` | `?string` | ID of the unit of measure |
+| `unitPrice` | `?string` | Net unit price (decimal string) |
+| `unitCost` | `?string` | Purchase/cost price per unit (decimal string) |
+| `discountPercentage` | `?string` | Discount percentage (decimal string) |
+| `grossAmount` | `?string` | Total gross amount (readOnly, decimal string) |
+| `netAmount` | `?string` | Total net amount (readOnly, decimal string) |
+| `netAmountInCompanyCurrency` | `?string` | Net amount in company currency (readOnly) |
+| `grossAmountInCompanyCurrency` | `?string` | Gross amount in company currency (readOnly) |
+| `unitPriceInCompanyCurrency` | `?string` | Unit price in company currency (readOnly) |
+| `unitCostInCompanyCurrency` | `?string` | Unit cost in company currency (readOnly) |
+| `netAmountForStatistics` | `?string` | Net amount for statistics (readOnly) |
+| `recommendedRetailPrice` | `?string` | Recommended retail price (readOnly) |
+| `invoicedQuantity` | `?string` | Already invoiced quantity (readOnly) |
+| `shippedQuantity` | `?string` | Already shipped quantity (readOnly) |
+| `returnedQuantity` | `?string` | Returned quantity (readOnly) |
+| `shipped` | `bool` | `true` if fully shipped (readOnly) |
+| `positionNumber` | `int` | Display position (1-based) |
+| `itemType` | `?string` | Item type — see `ItemType` enum |
+| `invoicingType` | `?string` | Invoicing mode — see `InvoicingType` enum |
+| `note` | `?string` | Internal staff note |
+| `groupName` | `?string` | Group header |
+| `parentItemId` | `?string` | Parent item ID (sub-positions) |
+| `addPageBreakBefore` | `bool` | Insert page break before in PDF |
+| `taxId` | `?string` | ID of the applied tax rate |
+| `manualQuantity` | `bool` | Quantity entered manually |
+| `manualUnitPrice` | `bool` | Unit price entered manually |
+| `manualUnitCost` | `bool` | Unit cost entered manually |
+| `manualPlannedWorkingTimePerUnit` | `bool` | Working time entered manually |
+| `servicePeriodFrom` / `servicePeriodTo` | `?int` | Service period (epoch ms) |
+| `plannedDeliveryDate` / `plannedShippingDate` | `?int` | Planning dates (epoch ms) |
+| `plannedWorkingTimePerUnit` | `?int` | Planned working time in minutes |
+| `contractChargeId` | `?string` | Related contract charge (readOnly) |
+| `serviceQuotaId` | `?string` | Related service quota (readOnly) |
+| `commissionSalesPartners`, `picks`, `tasks` | `array` | Nested relation arrays |
+| `ecommerceOrderItemIds`, `reductionAdditionItems`, `customAttributes` | `array` | Nested arrays |
+| `getQuantity()` | `?float` | Quantity as float |
+| `getUnitPrice()` | `?float` | Unit price as float |
+| `getNetAmount()` | `?float` | Net amount as float |
+| `getGrossAmount()` | `?float` | Gross amount as float |
+| `isFreeText()` | `bool` | `true` if item has no article reference |
+| `isService()` | `bool` | `true` if `itemType` is `SERVICE` or `SERVICE_QUOTA` |
+
+### SalesInvoiceDTO
+
+| Field | Type | Description |
+|---|---|---|
+| `invoiceNumber` | `string` | Human-readable invoice number (e.g. `RE-10042`, `CLX-1061`) |
+| `status` | `string` | Invoice status — see `SalesInvoiceStatus` enum |
 | `salesInvoiceType` | `string` | Invoice type — see `SalesInvoiceType` enum. `CREDIT_NOTE` = cancellation invoice |
+| `customerId` | `string` | ID of the linked customer |
+| `customerNumber` | `?string` | Human-readable customer number (e.g. `K-10042`) |
+| `partyId` | `?string` | ID of the underlying party record — use with `$client->parties()->find()` |
+| `customerName` | `?string` | Denormalised display name — not always returned by the API |
+| `invoiceDate` | `int` | Invoice date (epoch ms) |
+| `dueDate` | `?int` | Payment due date (epoch ms) |
+| `bookingDate` | `?int` | Accounting booking date (epoch ms) |
+| `paymentMethodId` | `?string` | ID of the assigned payment method |
+| `paymentStatus` | `?string` | e.g. `OPEN`, `PAID`, `CLEARED_WITH_CREDIT_NOTE` |
+| `paid` | `bool` | `true` if the invoice has been fully paid |
+| `netAmount`, `grossAmount` | `?float` | Net / gross invoice amount |
+| `openAmount` | `?float` | Remaining unpaid amount |
+| `currency` | `?string` | Currency code (e.g. `EUR`) |
+| `salesOrderId` | `?string` | ID of the originating sales order (if any) |
 | `precedingSalesInvoiceId` | `?string` | For `CREDIT_NOTE`: UUID of the original cancelled invoice |
 | `cancellationNumber` | `?string` | For cancelled invoices: CLX-number of the associated credit note |
-| `paid` | `bool` | `true` if the invoice has been fully paid |
-| `paymentStatus` | `?string` | e.g. `OPEN`, `PAID`, `CLEARED_WITH_CREDIT_NOTE` |
-| `bookingDate` | `?int` | Accounting booking date (epoch ms) |
-| `partyId` | `?string` | ID of the underlying party record — use with `$client->parties()->find()` |
-| `customerNumber` | `?string` | Human-readable customer number (e.g. `K-10042`) |
-| `customerName` | `?string` | Denormalised display name — not always returned by the API |
+| `salesInvoiceItems` | `list<SalesInvoiceItemDTO>` | Typed line items — see `SalesInvoiceItemDTO` |
+| `tags`, `customAttributes` | `array` | Tag and custom attribute objects |
 | `isCreditNote()` | `bool` | `true` if `salesInvoiceType === 'CREDIT_NOTE'` |
+| `isOpen()` | `bool` | `true` if `openAmount > 0` |
+| `getInvoiceDate()` | `?DateTimeImmutable` | Invoice date as object |
+| `getDueDate()` | `?DateTimeImmutable` | Due date as object |
 | `getBookingDate()` | `?DateTimeImmutable` | Booking date as object |
 | `getCustomerDisplayName()` | `string` | Best available inline name: `customerName` → `customerNumber` → `'Unknown'` |
 
 > To get a fully resolved display name that correctly handles ORGANIZATION vs. PERSON,
 > use `SalesInvoiceResource::resolveCustomerDisplayName($invoice)` instead.
+
+### SalesInvoiceItemDTO
+
+Embedded in `SalesInvoiceDTO::$salesInvoiceItems`. Maps the `salesInvoiceItem` schema.
+
+| Field | Type | Description |
+|---|---|---|
+| `articleId` | `?string` | ID of the linked article (null for FREE\_TEXT items) |
+| `title` | `?string` | Line item title |
+| `description` | `?string` | HTML description |
+| `quantity` | `?string` | Invoiced quantity (decimal string) |
+| `unitId` | `?string` | ID of the unit of measure |
+| `unitPrice` | `?string` | Net unit price (decimal string) |
+| `unitCost` | `?string` | Purchase/cost price per unit (decimal string) |
+| `discountPercentage` | `?string` | Discount percentage (decimal string) |
+| `grossAmount` | `?string` | Total gross amount (readOnly, decimal string) |
+| `netAmount` | `?string` | Total net amount (readOnly, decimal string) |
+| `netAmountInCompanyCurrency` | `?string` | Net amount in company currency (readOnly) |
+| `grossAmountInCompanyCurrency` | `?string` | Gross amount in company currency (readOnly) |
+| `unitPriceInCompanyCurrency` | `?string` | Unit price in company currency (readOnly) |
+| `unitCostInCompanyCurrency` | `?string` | Unit cost in company currency (readOnly) |
+| `netAmountForStatistics` | `?string` | Net amount for statistics (readOnly) |
+| `recommendedRetailPrice` | `?string` | Recommended retail price (readOnly) |
+| `positionNumber` | `int` | Display position (1-based) |
+| `itemType` | `?string` | Item type — see `ItemType` enum |
+| `note` | `?string` | Internal staff note |
+| `groupName` | `?string` | Group header |
+| `parentItemId` | `?string` | Parent item ID (sub-positions) |
+| `addPageBreakBefore` | `bool` | Insert page break before in PDF |
+| `taxId` | `?string` | ID of the applied tax rate |
+| `accountId` | `?string` | Revenue account ID (accounting integration) |
+| `costTypeId` | `?string` | Cost type ID (cost accounting) |
+| `cost2CostCenterId` | `?string` | Secondary cost centre ID |
+| `creditedInvoiceItemId` | `?string` | For credit note items: ID of the original invoice item being cancelled |
+| `contractItemId` | `?string` | Originating contract item ID (readOnly) |
+| `manualQuantity` | `bool` | Quantity entered manually |
+| `manualUnitPrice` | `bool` | Unit price entered manually |
+| `manualUnitCost` | `bool` | Unit cost entered manually |
+| `servicePeriodFrom` / `servicePeriodTo` | `?int` | Service period (epoch ms) |
+| `deliveryDate` / `shippingDate` | `?int` | Delivery / shipping date for this line (epoch ms) |
+| `commissionSalesPartners`, `costCenterItems` | `array` | Nested relation arrays |
+| `reductionAdditionItems`, `salesInvoiceItemRelationships` | `array` | Nested arrays |
+| `serialNumbers`, `customAttributes` | `array` | Nested arrays |
+| `getQuantity()` | `?float` | Quantity as float |
+| `getUnitPrice()` | `?float` | Unit price as float |
+| `getNetAmount()` | `?float` | Net amount as float |
+| `getGrossAmount()` | `?float` | Gross amount as float |
+| `isFreeText()` | `bool` | `true` if item has no article reference |
+| `isCreditNoteItem()` | `bool` | `true` if `creditedInvoiceItemId` is set |
+
+### QuotationDTO
+
+| Field | Type | Description |
+|---|---|---|
+| `quotationNumber` | `string` | Human-readable quotation number |
+| `status` | `string` | Quotation status — see `QuotationStatus` enum |
+| `customerId` | `string` | ID of the linked customer |
+| `netAmount`, `grossAmount` | `?float` | Net / gross quotation amount |
+| `currency` | `?string` | Currency code |
+| `quotationItems` | `array` | Raw line item arrays |
 
 ### PartyDTO
 
