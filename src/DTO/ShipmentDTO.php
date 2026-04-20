@@ -72,9 +72,9 @@ final class ShipmentDTO extends AbstractDTO
      * @param int         $packageWidth                  Package width in mm.
      * @param int         $shippingLabelsCount           Number of shipping labels generated.
      * @param int         $shippingReturnLabelsCount     Number of return shipping labels generated.
-     * @param AddressDTO|null  $invoiceAddress            Invoice address for this shipment.
-     * @param AddressDTO|null  $recipientAddress          Recipient / delivery address.
-     * @param AddressDTO|null  $shippedFromAddress        Address the goods were shipped from.
+     * @param RecordAddressDTO|null $invoiceAddress        Invoice address for this shipment.
+     * @param RecordAddressDTO|null $recipientAddress     Recipient / delivery address.
+     * @param RecordAddressDTO|null $shippedFromAddress   Address the goods were shipped from.
      * @param list<ShipmentItemDTO>    $shipmentItems         Line items of this shipment.
      * @param list<ParcelDTO>          $parcels               Parcel records with tracking information.
      * @param list<CustomAttributeDTO> $customAttributes      Custom attribute values.
@@ -160,9 +160,9 @@ final class ShipmentDTO extends AbstractDTO
         public readonly ?int    $shippingDate,
 
         // Addresses (recordAddress schema)
-        public readonly ?AddressDTO $invoiceAddress,
-        public readonly ?AddressDTO $recipientAddress,
-        public readonly ?AddressDTO $shippedFromAddress,
+        public readonly ?RecordAddressDTO $invoiceAddress,
+        public readonly ?RecordAddressDTO $recipientAddress,
+        public readonly ?RecordAddressDTO $shippedFromAddress,
 
         // Nested typed arrays
         public readonly array   $shipmentItems,
@@ -186,15 +186,15 @@ final class ShipmentDTO extends AbstractDTO
     public static function fromArray(array $data): static
     {
         $invoiceAddress = isset($data['invoiceAddress']) && is_array($data['invoiceAddress'])
-            ? AddressDTO::fromArray($data['invoiceAddress'])
+            ? RecordAddressDTO::fromArray($data['invoiceAddress'])
             : null;
 
         $recipientAddress = isset($data['recipientAddress']) && is_array($data['recipientAddress'])
-            ? AddressDTO::fromArray($data['recipientAddress'])
+            ? RecordAddressDTO::fromArray($data['recipientAddress'])
             : null;
 
         $shippedFromAddress = isset($data['shippedFromAddress']) && is_array($data['shippedFromAddress'])
-            ? AddressDTO::fromArray($data['shippedFromAddress'])
+            ? RecordAddressDTO::fromArray($data['shippedFromAddress'])
             : null;
 
         return new static(

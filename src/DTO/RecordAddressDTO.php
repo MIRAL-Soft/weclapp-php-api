@@ -5,40 +5,36 @@ declare(strict_types=1);
 namespace miralsoft\weclapp\api\DTO;
 
 /**
- * Represents an address record from the weclapp API.
+ * Represents an embedded address on a weclapp sales document.
  *
- * Maps to the `address` schema (24 fields, WITH identity: id/version/timestamps).
- * Used exclusively for entries in the `$addresses` array on party-based DTOs
- * (PartyDTO, CustomerDTO, ContactDTO, SupplierDTO).
+ * Maps to the `recordAddress` schema used for deliveryAddress, invoiceAddress
+ * and recordAddress fields on SalesOrderDTO, SalesInvoiceDTO and QuotationDTO
+ * (and similarly on PurchaseOrderDTO and ShipmentDTO).
  *
- * For embedded addresses on sales documents (deliveryAddress, invoiceAddress,
- * recordAddress on SalesOrderDTO, SalesInvoiceDTO, QuotationDTO etc.) use
- * RecordAddressDTO instead, which maps to the distinct `recordAddress` schema
- * (18 fields, NO identity, adds middleName).
+ * Unlike AddressDTO (which maps to the `address` schema used in
+ * PartyDTO::$addresses), this schema has NO identity fields (no id, version,
+ * createdDate, lastModifiedDate). It adds `middleName` and omits the boolean
+ * flags deliveryAddress, invoiceAddress and primaryAddress.
  *
- * @see \miralsoft\weclapp\api\DTO\RecordAddressDTO
+ * All 18 fields are nullable strings — none are required by the API schema.
+ *
+ * @see \miralsoft\weclapp\api\DTO\AddressDTO  For the party address schema (24 fields, with identity).
  */
-final class AddressDTO extends AbstractDTO
+final class RecordAddressDTO extends AbstractDTO
 {
     /**
-     * @param string      $id                    Internal weclapp UUID (readOnly).
-     * @param string      $version               Optimistic locking version string (readOnly).
-     * @param int         $createdDate           Creation timestamp in epoch milliseconds (readOnly).
-     * @param int         $lastModifiedDate      Last modification timestamp in epoch milliseconds (readOnly).
      * @param string|null $city                  City name.
      * @param string|null $company               Primary company name.
      * @param string|null $company2              Secondary company name / department.
      * @param string|null $countryCode           ISO 3166-1 alpha-2 country code (e.g. "DE").
-     * @param bool        $deliveryAddress       True if this address is marked as a delivery address.
      * @param string|null $firstName             First name of the contact person.
      * @param string|null $globalLocationNumber  GS1 Global Location Number.
-     * @param bool        $invoiceAddress        True if this address is marked as an invoice address.
      * @param string|null $lastName              Last name of the contact person.
+     * @param string|null $middleName            Middle name of the contact person.
      * @param string|null $phoneNumber           Phone number.
      * @param string|null $postOfficeBoxCity     City for post office box address.
      * @param string|null $postOfficeBoxNumber   Post office box number.
      * @param string|null $postOfficeBoxZipCode  Zip code for post office box address.
-     * @param bool        $primaryAddress        True if this is the primary address.
      * @param string|null $salutation            Salutation (e.g. "MR", "MRS").
      * @param string|null $state                 State or region.
      * @param string|null $street1               Primary street line.
@@ -47,24 +43,18 @@ final class AddressDTO extends AbstractDTO
      * @param string|null $zipcode               Postal zip code.
      */
     public function __construct(
-        public readonly string  $id,
-        public readonly string  $version,
-        public readonly int     $createdDate,
-        public readonly int     $lastModifiedDate,
         public readonly ?string $city,
         public readonly ?string $company,
         public readonly ?string $company2,
         public readonly ?string $countryCode,
-        public readonly bool    $deliveryAddress,
         public readonly ?string $firstName,
         public readonly ?string $globalLocationNumber,
-        public readonly bool    $invoiceAddress,
         public readonly ?string $lastName,
+        public readonly ?string $middleName,
         public readonly ?string $phoneNumber,
         public readonly ?string $postOfficeBoxCity,
         public readonly ?string $postOfficeBoxNumber,
         public readonly ?string $postOfficeBoxZipCode,
-        public readonly bool    $primaryAddress,
         public readonly ?string $salutation,
         public readonly ?string $state,
         public readonly ?string $street1,
@@ -74,31 +64,25 @@ final class AddressDTO extends AbstractDTO
     ) {}
 
     /**
-     * Create an AddressDTO from a raw weclapp API response array.
+     * Create a RecordAddressDTO from a raw weclapp API response array.
      *
      * @param array<string, mixed> $data
      */
     public static function fromArray(array $data): static
     {
         return new static(
-            id:                   self::str($data, 'id'),
-            version:              self::str($data, 'version'),
-            createdDate:          self::int($data, 'createdDate'),
-            lastModifiedDate:     self::int($data, 'lastModifiedDate'),
             city:                 self::strOrNull($data, 'city'),
             company:              self::strOrNull($data, 'company'),
             company2:             self::strOrNull($data, 'company2'),
             countryCode:          self::strOrNull($data, 'countryCode'),
-            deliveryAddress:      self::bool($data, 'deliveryAddress'),
             firstName:            self::strOrNull($data, 'firstName'),
             globalLocationNumber: self::strOrNull($data, 'globalLocationNumber'),
-            invoiceAddress:       self::bool($data, 'invoiceAddress'),
             lastName:             self::strOrNull($data, 'lastName'),
+            middleName:           self::strOrNull($data, 'middleName'),
             phoneNumber:          self::strOrNull($data, 'phoneNumber'),
             postOfficeBoxCity:    self::strOrNull($data, 'postOfficeBoxCity'),
             postOfficeBoxNumber:  self::strOrNull($data, 'postOfficeBoxNumber'),
             postOfficeBoxZipCode: self::strOrNull($data, 'postOfficeBoxZipCode'),
-            primaryAddress:       self::bool($data, 'primaryAddress'),
             salutation:           self::strOrNull($data, 'salutation'),
             state:                self::strOrNull($data, 'state'),
             street1:              self::strOrNull($data, 'street1'),
@@ -113,10 +97,16 @@ final class AddressDTO extends AbstractDTO
      */
     public function getDisplayLine(): string
     {
+        $name = trim(implode(' ', array_filter([
+            $this->firstName,
+            $this->middleName,
+            $this->lastName,
+        ])));
+
         $parts = array_filter([
-            $this->company ?? ($this->firstName . ' ' . $this->lastName),
+            $this->company ?? ($name ?: null),
             $this->street1,
-            $this->zipcode . ' ' . $this->city,
+            trim(($this->zipcode ?? '') . ' ' . ($this->city ?? '')) ?: null,
             $this->countryCode,
         ]);
 

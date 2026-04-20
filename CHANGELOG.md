@@ -7,6 +7,51 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased] — Branch `WeclappAPIv2`
 
+### Added — RecordAddressDTO (correct schema for embedded document addresses)
+
+- **`RecordAddressDTO`** — new DTO mapping the `recordAddress` schema used for embedded
+  addresses on sales documents (`deliveryAddress`, `invoiceAddress`, `recordAddress` fields).
+  Distinct from `AddressDTO` (`address` schema, 24 fields, with identity) in two key ways:
+  - **No identity fields** — no `id`, `version`, `createdDate`, `lastModifiedDate`.
+  - **Adds `middleName`** — a field absent from the `address` schema.
+  All 18 fields are `?string` (none are required by the API schema):
+  `city`, `company`, `company2`, `countryCode`, `firstName`, `globalLocationNumber`,
+  `lastName`, `middleName`, `phoneNumber`, `postOfficeBoxCity`, `postOfficeBoxNumber`,
+  `postOfficeBoxZipCode`, `salutation`, `state`, `street1`, `street2`, `titleId`, `zipcode`.
+  Helper method: `getDisplayLine()` — single-line representation including middle name.
+
+### Changed — RecordAddressDTO adoption in document DTOs (breaking)
+
+- **`SalesOrderDTO`** — `$deliveryAddress`, `$invoiceAddress`, `$recordAddress` type changed
+  from `?AddressDTO` to `?RecordAddressDTO`. The API returns the `recordAddress` schema for
+  these fields, not the `address` schema; `AddressDTO` was incorrectly hydrating them and
+  silently dropping `middleName` while demanding non-nullable id/version/timestamps.
+  **Breaking**: any code that typed these as `AddressDTO` must be updated to `RecordAddressDTO`.
+
+- **`SalesInvoiceDTO`** — `$deliveryAddress`, `$recordAddress` type changed from
+  `?AddressDTO` to `?RecordAddressDTO`. Same rationale as above.
+  **Breaking**: update type hints to `RecordAddressDTO`.
+
+- **`QuotationDTO`** — `$deliveryAddress`, `$invoiceAddress`, `$recordAddress` type changed
+  from `?AddressDTO` to `?RecordAddressDTO`. Same rationale.
+  **Breaking**: update type hints to `RecordAddressDTO`.
+
+- **`PurchaseOrderDTO`** — `$deliveryAddress`, `$invoiceAddress`, `$recordAddress` type changed
+  from `?AddressDTO` to `?RecordAddressDTO`. The `purchaseOrder` schema also uses `recordAddress`
+  for all three address fields (confirmed from OpenAPI spec).
+  **Breaking**: update type hints to `RecordAddressDTO`.
+
+- **`ShipmentDTO`** — `$invoiceAddress`, `$recipientAddress`, `$shippedFromAddress` type changed
+  from `?AddressDTO` to `?RecordAddressDTO`. The `shipment` schema uses `recordAddress` for all
+  three address fields (confirmed from OpenAPI spec).
+  **Breaking**: update type hints to `RecordAddressDTO`.
+
+- **`AddressDTO`** — class docblock corrected. Now explicitly documents that this DTO is only
+  for entries in `$addresses` on party-based DTOs (PartyDTO, CustomerDTO etc.), and links
+  to `RecordAddressDTO` for embedded document addresses.
+
+---
+
 ### Added — Line Item DTOs
 
 - **`SalesOrderItemDTO`** — typed DTO for `salesOrderItem` entries embedded in `SalesOrderDTO::$orderItems`.

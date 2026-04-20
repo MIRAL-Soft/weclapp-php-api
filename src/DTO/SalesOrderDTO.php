@@ -91,9 +91,9 @@ final class SalesOrderDTO extends AbstractDTO
      * @param bool        $recordOpeningInheritance              True if the opening is inherited.
      * @param string|null $note                                  Internal note.
      * @param string|null $dispatchCountryCode                   Country code used for dispatch (enum: country).
-     * @param AddressDTO|null  $deliveryAddress                  Delivery address for this order.
-     * @param AddressDTO|null  $invoiceAddress                   Invoice address for this order.
-     * @param AddressDTO|null  $recordAddress                    Record address for this order.
+     * @param RecordAddressDTO|null $deliveryAddress              Delivery address for this order.
+     * @param RecordAddressDTO|null $invoiceAddress              Invoice address for this order.
+     * @param RecordAddressDTO|null $recordAddress               Record address for this order.
      * @param list<SalesOrderItemDTO>         $orderItems            Line items of this order.
      * @param list<CommissionSalesPartnerDTO> $commissionSalesPartners Commission assignments.
      * @param list<SalesOrderPaymentDTO>      $payments              Payment conditions / instalments.
@@ -208,9 +208,9 @@ final class SalesOrderDTO extends AbstractDTO
         public readonly ?string     $dispatchCountryCode,
 
         // Addresses
-        public readonly ?AddressDTO $deliveryAddress,
-        public readonly ?AddressDTO $invoiceAddress,
-        public readonly ?AddressDTO $recordAddress,
+        public readonly ?RecordAddressDTO $deliveryAddress,
+        public readonly ?RecordAddressDTO $invoiceAddress,
+        public readonly ?RecordAddressDTO $recordAddress,
 
         // Nested typed arrays
         public readonly array       $orderItems,
@@ -239,15 +239,15 @@ final class SalesOrderDTO extends AbstractDTO
     public static function fromArray(array $data): static
     {
         $deliveryAddress = isset($data['deliveryAddress']) && is_array($data['deliveryAddress'])
-            ? AddressDTO::fromArray($data['deliveryAddress'])
+            ? RecordAddressDTO::fromArray($data['deliveryAddress'])
             : null;
 
         $invoiceAddress = isset($data['invoiceAddress']) && is_array($data['invoiceAddress'])
-            ? AddressDTO::fromArray($data['invoiceAddress'])
+            ? RecordAddressDTO::fromArray($data['invoiceAddress'])
             : null;
 
         $recordAddress = isset($data['recordAddress']) && is_array($data['recordAddress'])
-            ? AddressDTO::fromArray($data['recordAddress'])
+            ? RecordAddressDTO::fromArray($data['recordAddress'])
             : null;
 
         return new static(

@@ -103,8 +103,8 @@ final class SalesInvoiceDTO extends AbstractDTO
      * @param string|null $termOfPaymentId                         ID of the term of payment.
      * @param string|null $vatRegistrationNumber                   VAT registration number.
      * @param string|null $collectiveInvoicePositionPrintType      Print type for collective invoice positions.
-     * @param AddressDTO|null  $deliveryAddress                    Delivery address for this invoice.
-     * @param AddressDTO|null  $recordAddress                      Record address for this invoice.
+     * @param RecordAddressDTO|null $deliveryAddress                Delivery address for this invoice.
+     * @param RecordAddressDTO|null $recordAddress                 Record address for this invoice.
      * @param list<SalesInvoiceItemDTO>       $salesInvoiceItems        Line items of this invoice.
      * @param list<CommissionSalesPartnerDTO> $commissionSalesPartners  Commission assignments.
      * @param list<ShippingCostItemDTO>       $shippingCostItems        Shipping cost items.
@@ -226,8 +226,8 @@ final class SalesInvoiceDTO extends AbstractDTO
         public readonly bool        $recordOpeningInheritance,
 
         // Addresses
-        public readonly ?AddressDTO $deliveryAddress,
-        public readonly ?AddressDTO $recordAddress,
+        public readonly ?RecordAddressDTO $deliveryAddress,
+        public readonly ?RecordAddressDTO $recordAddress,
 
         // Nested typed arrays
         public readonly array       $salesInvoiceItems,
@@ -250,11 +250,11 @@ final class SalesInvoiceDTO extends AbstractDTO
     public static function fromArray(array $data): static
     {
         $deliveryAddress = isset($data['deliveryAddress']) && is_array($data['deliveryAddress'])
-            ? AddressDTO::fromArray($data['deliveryAddress'])
+            ? RecordAddressDTO::fromArray($data['deliveryAddress'])
             : null;
 
         $recordAddress = isset($data['recordAddress']) && is_array($data['recordAddress'])
-            ? AddressDTO::fromArray($data['recordAddress'])
+            ? RecordAddressDTO::fromArray($data['recordAddress'])
             : null;
 
         return new static(
