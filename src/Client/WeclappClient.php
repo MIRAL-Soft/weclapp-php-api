@@ -18,6 +18,7 @@ use miralsoft\weclapp\api\Resource\SalesInvoiceResource;
 use miralsoft\weclapp\api\Resource\SalesOrderResource;
 use miralsoft\weclapp\api\Resource\ShipmentResource;
 use miralsoft\weclapp\api\Resource\SupplierResource;
+use miralsoft\weclapp\api\Resource\TicketResource;
 use miralsoft\weclapp\api\Resource\WebhookResource;
 use Psr\Log\LoggerInterface;
 use Psr\SimpleCache\CacheInterface;
@@ -246,6 +247,23 @@ final class WeclappClient
     public function shipments(): ShipmentResource
     {
         return new ShipmentResource($this->http, $this->rateLimiter, $this->cache);
+    }
+
+    /**
+     * Returns the Ticket resource for CRUD and support-ticket operations.
+     *
+     * Tickets track customer support requests, complaints or service work.
+     * They can be linked to parties, contacts, contracts and sales orders.
+     *
+     * Endpoint: /api/v2/ticket
+     *
+     * @example
+     * $tickets = $client->tickets()->findByParty($customerId);
+     * $open    = $client->tickets()->findByStatus($openStatusId);
+     */
+    public function tickets(): TicketResource
+    {
+        return new TicketResource($this->http, $this->rateLimiter, $this->cache);
     }
 
     /**

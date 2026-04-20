@@ -238,6 +238,43 @@ New helper method: `isActive()`, `getSupplierMinimumPurchaseOrderAmount()`, `get
 
 ---
 
+### Added — Ticket Resource (full 51-field schema)
+
+- **`TicketDTO`** — typed DTO for the `ticket` schema.
+  All 51 fields: identity (`id`, `version`, `createdDate`, `lastModifiedDate`), `ticketNumber`,
+  `subject`, `description`, `note`, status/classification (`ticketStatusId`, `ticketTypeId`,
+  `ticketCategoryId`, `ticketChannelId`, `ticketPriorityId`, `ticketServiceLevelAgreementId`),
+  assignment (`assignedUserId`, `assignedPoolingGroupId`, `responsibleUserId`),
+  linked entities (`partyId`, `contactId`, `contractId`, `salesOrderId`, `legacyArticleId`,
+  `mail2TicketId`), denormalized contact info (`firstName`, `lastName`, `email`,
+  `ccEmailAddresses` as comma-separated string, `phoneNumber`, `mobilePhoneNumber`, `room`,
+  `language`), billing/performance (`invoicingStatus`, `performanceRecordedStatus`),
+  rating (`ticketRating` enum `STARS_1`–`STARS_5`, `ticketRatingComment`, `ticketRatingDate`),
+  public page (`publicPageUuid`, `publicPageExpirationDate`), dates (`finishedDate`,
+  `followUpDate`, `solutionDueDate`), boolean flags (`billable`, `billableStatus`,
+  `disableEmailTemplates`, `isTemplate`, `legacyTimeAndMaterialTicket`, `resolvedYourIssue`).
+  Typed nested arrays: `customAttributes` (`list<CustomAttributeDTO>`).
+  Raw arrays: `entityReferences` (linked entity `{entityId, entityName}` objects),
+  `tags`, `watchers` (`{id}` objects).
+  Helper methods: `isBilled()`, `getContactDisplayName()`, `getRatingStars()` (maps enum to
+  int 1–5), `getSolutionDueDate()`, `getFinishedDate()`, `getCreatedAt()`, `getLastModifiedAt()`.
+
+- **`TicketResource`** — new resource registered as `$client->tickets()`.
+  Methods:
+  - `all(?QueryBuilder $query): list<TicketDTO>` — list all tickets
+  - `find(string $id): TicketDTO` — fetch by ID
+  - `create(array $data): TicketDTO` — create a ticket
+  - `update(string $id, array $data): TicketDTO` — update a ticket
+  - `delete(string $id): void` — delete a ticket
+  - `findByParty(string $partyId): list<TicketDTO>` — filter by linked party
+  - `findByStatus(string $ticketStatusId): list<TicketDTO>` — filter by status
+  - `findByAssignedUser(string $userId): list<TicketDTO>` — filter by assigned user
+  - `findBySalesOrder(string $salesOrderId): list<TicketDTO>` — filter by linked sales order
+
+- **`WeclappClient::tickets()`** — factory method to create a `TicketResource` instance.
+
+---
+
 ### Added — Purchase Order Resource (full 68-field schema)
 
 - **`PurchaseOrderItemDTO`** — typed DTO for `purchaseOrderItem` entries embedded in
