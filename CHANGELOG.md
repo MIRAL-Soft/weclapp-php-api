@@ -238,6 +238,53 @@ New helper method: `isActive()`, `getSupplierMinimumPurchaseOrderAmount()`, `get
 
 ---
 
+### Added — Purchase Order Resource (full 68-field schema)
+
+- **`PurchaseOrderItemDTO`** — typed DTO for `purchaseOrderItem` entries embedded in
+  `PurchaseOrderDTO::$purchaseOrderItems`.
+  Full inheritance chain resolved (42 fields total): identity, `articleId`, `title`, `description`,
+  `descriptionFixed`, `quantity`, `unitId`, `unitPrice`, `unitPriceInCompanyCurrency`,
+  `discountPercentage`, computed amounts (gross/net incl. company-currency variants),
+  fulfillment state (`invoicedQuantity`, `receivedQuantity`), item classification fields,
+  manual override flags, service period dates (`servicePeriodFromDate`, `servicePeriodToDate`),
+  purchase-specific fields (`articleSupplySourceId`, `blanketPurchaseOrderId`,
+  `blanketPurchaseOrderReleaseId`, `purchaseOrderRequestOfferItemId`, `salesOrderItemId`),
+  typed `reductionAdditionItems`, raw `batchSerialNumbers`, typed `customAttributes`.
+  Helper methods: `getQuantity()`, `getUnitPrice()`, `getNetAmount()`,
+  `getServicePeriodFromDate()`, `getServicePeriodToDate()`.
+
+- **`PurchaseOrderDTO`** — typed DTO for the `purchaseOrder` schema.
+  All 68 fields: identity, `purchaseOrderNumber`, `status`, `purchaseOrderType`, `supplierId`,
+  `creatorId`, `responsibleUserId`, `description`, `note`, `advancePaymentStatus`,
+  commercial fields, currency fields, amount fields, reference fields,
+  package tracking fields, country codes, dates (orderDate, plannedDeliveryDate,
+  plannedShippingDate, servicePeriodFrom/To, shippingNotificationDate),
+  boolean flags (disableRecordEmailingRule, includeCashDiscountInValuationPrice,
+  invoiced, paid, received, sentToRecipient), record text fields.
+  Embedded addresses: `deliveryAddress`, `invoiceAddress`, `recordAddress` (typed `?AddressDTO`).
+  Typed nested arrays: `purchaseOrderItems` (`list<PurchaseOrderItemDTO>`),
+  `shippingCostItems` (`list<ShippingCostItemDTO>`), `customAttributes` (`list<CustomAttributeDTO>`).
+  Typed email object: `recordEmailAddresses` (`?EmailAddressesDTO`).
+  Raw arrays: `statusHistory`, `tags`, `dropshippingDeliveryNoteFormTexts`.
+  Helper methods: `isFullyReceived()`, `isFullyInvoiced()`, `getNetAmount()`, `getGrossAmount()`,
+  `getOrderDate()`, `getPlannedDeliveryDate()`, `getCreatedAt()`, `getLastModifiedAt()`.
+
+- **`PurchaseOrderResource`** — new resource registered as `$client->purchaseOrders()`.
+  Methods:
+  - `all(?QueryBuilder $query): list<PurchaseOrderDTO>` — list all purchase orders
+  - `find(string $id): PurchaseOrderDTO` — fetch by ID
+  - `create(array $data): PurchaseOrderDTO` — create a purchase order
+  - `update(string $id, array $data): PurchaseOrderDTO` — update a purchase order
+  - `delete(string $id): void` — delete a purchase order
+  - `findBySupplier(string $supplierId): list<PurchaseOrderDTO>` — filter by supplier
+  - `findBySalesOrder(string $salesOrderId): list<PurchaseOrderDTO>` — filter by linked sales order
+  - `getPdf(string $id): string` — download the purchase order PDF
+  - `getCancellationSlipPdf(string $id): string` — download the cancellation slip PDF
+
+- **`WeclappClient::purchaseOrders()`** — factory method to create a `PurchaseOrderResource` instance.
+
+---
+
 ### Added — Shipment Resource (full 61-field schema)
 
 - **`ParcelDTO`** — typed DTO for `parcel` entries embedded in `ShipmentDTO::$parcels`.

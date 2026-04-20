@@ -12,6 +12,7 @@ use miralsoft\weclapp\api\Resource\ContactResource;
 use miralsoft\weclapp\api\Resource\CustomerResource;
 use miralsoft\weclapp\api\Resource\DocumentResource;
 use miralsoft\weclapp\api\Resource\PartyResource;
+use miralsoft\weclapp\api\Resource\PurchaseOrderResource;
 use miralsoft\weclapp\api\Resource\QuotationResource;
 use miralsoft\weclapp\api\Resource\SalesInvoiceResource;
 use miralsoft\weclapp\api\Resource\SalesOrderResource;
@@ -213,6 +214,22 @@ final class WeclappClient
     public function quotations(): QuotationResource
     {
         return new QuotationResource($this->http, $this->rateLimiter, $this->cache);
+    }
+
+    /**
+     * Returns the Purchase Order resource for CRUD and PDF operations.
+     *
+     * Purchase orders are sent to suppliers to order goods or services.
+     * Endpoint: /api/v2/purchaseOrder
+     *
+     * @example
+     * $orders = $client->purchaseOrders()->findBySupplier($supplierId);
+     * $pdf = $client->purchaseOrders()->getPdf($orderId);
+     * file_put_contents('purchase-order.pdf', $pdf);
+     */
+    public function purchaseOrders(): PurchaseOrderResource
+    {
+        return new PurchaseOrderResource($this->http, $this->rateLimiter, $this->cache);
     }
 
     /**
