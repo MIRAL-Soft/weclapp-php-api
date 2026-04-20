@@ -42,6 +42,7 @@ final class SalesInvoiceDTO extends AbstractDTO
      * @param int|null    $dueDate                                 Payment due date in epoch milliseconds.
      * @param int|null    $bookingDate                             Accounting booking date in epoch milliseconds.
      * @param string|null $bookingText                             Accounting booking text.
+     * @param string|null $description                             Internal description / comment.
      * @param string|null $paymentMethodId                         ID of the assigned payment method.
      * @param string|null $paymentStatus                           Payment status (e.g. "OPEN", "PAID").
      * @param bool        $paid                                    True if the invoice has been fully paid.
@@ -133,6 +134,7 @@ final class SalesInvoiceDTO extends AbstractDTO
         public readonly ?int        $dueDate,
         public readonly ?int        $bookingDate,
         public readonly ?string     $bookingText,
+        public readonly ?string     $description,
 
         // Payment
         public readonly ?string     $paymentMethodId,
@@ -272,6 +274,7 @@ final class SalesInvoiceDTO extends AbstractDTO
             dueDate:                                  self::intOrNull($data, 'dueDate'),
             bookingDate:                              self::intOrNull($data, 'bookingDate'),
             bookingText:                              self::strOrNull($data, 'bookingText'),
+            description:                              self::strOrNull($data, 'description'),
 
             paymentMethodId:                          self::strOrNull($data, 'paymentMethodId'),
             paymentStatus:                            self::strOrNull($data, 'paymentStatus'),
