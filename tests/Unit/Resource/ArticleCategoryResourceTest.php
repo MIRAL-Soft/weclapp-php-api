@@ -36,14 +36,12 @@ class ArticleCategoryResourceTest extends TestCase
         ?string $parentId = null,
     ): array {
         return [
-            'id'                 => $id,
-            'version'            => '1',
-            'createdDate'        => 1711400000000,
-            'lastModifiedDate'   => 1711450000000,
-            'name'               => $name,
-            'active'             => true,
-            'parentCategoryId'   => $parentId,
-            'parentCategoryName' => $parentId !== null ? 'Parent' : null,
+            'id'               => $id,
+            'version'          => '1',
+            'createdDate'      => 1711400000000,
+            'lastModifiedDate' => 1711450000000,
+            'name'             => $name,
+            'parentCategoryId' => $parentId,
         ];
     }
 
@@ -53,8 +51,9 @@ class ArticleCategoryResourceTest extends TestCase
         $category = $client->articleCategories()->find('cat-1');
 
         self::assertInstanceOf(ArticleCategoryDTO::class, $category);
+        self::assertSame('cat-1', $category->id);
         self::assertSame('Electronics', $category->name);
-        self::assertTrue($category->active);
+        self::assertNull($category->parentCategoryId);
     }
 
     public function test_find_by_name_returns_matching_category(): void

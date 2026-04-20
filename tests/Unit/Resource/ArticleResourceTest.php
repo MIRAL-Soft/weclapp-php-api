@@ -33,23 +33,19 @@ class ArticleResourceTest extends TestCase
     private function articlePayload(string $id = 'art-1', string $number = 'ART-001'): array
     {
         return [
-            'id'              => $id,
-            'version'         => '1',
-            'createdDate'     => 1711400000000,
-            'lastModifiedDate' => 1711450000000,
-            'articleNumber'   => $number,
-            'name'            => 'Test Article',
-            'active'          => true,
-            'sellable'        => true,
-            'purchasable'     => false,
-            'stockable'       => true,
+            'id'                   => $id,
+            'version'              => '1',
+            'createdDate'          => 1711400000000,
+            'lastModifiedDate'     => 1711450000000,
+            'articleNumber'        => $number,
+            'name'                 => 'Test Article',
+            'active'               => true,
+            'availableInSale'      => true,   // correct API key (formerly: sellable)
             'serialNumberRequired' => false,
             'batchNumberRequired'  => false,
-            'salesPrice'      => 49.99,
-            'availableStock'  => 10.0,
-            'tags'            => [],
-            'customAttributes' => [],
-            'articleImages'   => [],
+            'tags'                 => [],
+            'customAttributes'     => [],
+            'articleImages'        => [],
         ];
     }
 
@@ -60,7 +56,8 @@ class ArticleResourceTest extends TestCase
 
         self::assertInstanceOf(ArticleDTO::class, $article);
         self::assertSame('ART-001', $article->articleNumber);
-        self::assertSame(49.99, $article->salesPrice);
+        self::assertTrue($article->active);
+        self::assertTrue($article->availableInSale);
     }
 
     public function test_find_by_article_number_returns_correct_article(): void
@@ -84,20 +81,20 @@ class ArticleResourceTest extends TestCase
         $client->articles()->findByArticleNumber('UNKNOWN');
     }
 
-    public function test_is_in_stock_returns_true_for_positive_stock(): void
+    public function test_is_bill_of_material_returns_false_when_no_items(): void
+    {
+        // availableStock / isInStock() are not part of the article schema;
+        // stock is resolved from a separate endpoint.
+        $article = ArticleDTO::fromArray($this->articlePayload());
+
+        self::assertFalse($article->isBillOfMaterial());
+    }
+
+    public function test_get_main_image_returns_null_when_no_images(): void
     {
         $article = ArticleDTO::fromArray($this->articlePayload());
 
-        self::assertTrue($article->isInStock());
-    }
-
-    public function test_is_in_stock_returns_false_for_zero_stock(): void
-    {
-        $data                   = $this->articlePayload();
-        $data['availableStock'] = 0.0;
-        $article                = ArticleDTO::fromArray($data);
-
-        self::assertFalse($article->isInStock());
+        self::assertNull($article->getMainImage());
     }
 
     public function test_create_article(): void

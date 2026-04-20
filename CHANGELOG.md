@@ -7,6 +7,71 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased] — Branch `WeclappAPIv2`
 
+### Added — Number Range support (proforma invoice detection for DATEV)
+
+- **`NumberRangeType` enum** — all 45 entity types that have a configurable number range in
+  weclapp (e.g. `SALES_INVOICE`, `PROFORMA_INVOICE`, `SALES_INVOICE_CANCELLATION`).
+  Key insight: proforma invoices are **NOT** identified by `salesInvoiceType` — that enum
+  contains no proforma value in the weclapp API spec. Proforma invoices are distinguished
+  exclusively by their `invoiceNumber` prefix (e.g. `"PR-"`) which is derived from the
+  `PROFORMA_INVOICE` number range configuration, queryable at runtime.
+
+- **`NumberRangeDTO`** — maps the `numberRange` schema (`/api/v2/numberRange`).
+  Fields: identity (`id`, `version`, `createdDate`, `lastModifiedDate`) + `type`
+  (a `numberRangeType` string value).
+  Helper: `getType(): ?NumberRangeType` — returns the typed enum case.
+
+- **`NumberRangeValueDTO`** — maps the `numberRangeValue` schema (`/api/v2/numberRangeValue`).
+  All 12 fields beyond identity: `numberRangeId`, `interval`, `lastValue`, `length`,
+  `prefix` (e.g. `"PR-"`), `suffix`, `validFromDate`, `validToDate`,
+  `salesInvoiceTypes` (`list<string>`), `creditNoteInvoiceTypes` (`list<string>`),
+  `salesChannels`, `articleCategories`.
+  Helper methods:
+  - `isCurrentlyActive(): bool` — `true` if today falls within the validity period
+  - `getValidFrom(): ?DateTimeImmutable`, `getValidTo(): ?DateTimeImmutable`
+  - `formatNextNumber(): string` — formats the next number (e.g. `"PR-0042"`) based
+    on `lastValue + interval`, optionally zero-padded to `length` digits
+
+- **`NumberRangeResource`** — read-only resource for `/api/v2/numberRange`.
+  Methods:
+  - `find(string $id): NumberRangeDTO`
+  - `findByType(NumberRangeType|string $type): ?NumberRangeDTO` — returns the range
+    configured for the given entity type, or `null` if not configured
+  - `getProformaInvoicePrefix(): ?string` — two-step API lookup:
+    1. `GET /numberRange?type-eq=PROFORMA_INVOICE` — find the proforma range
+    2. `GET /numberRangeValue?numberRangeId-eq={id}` — read the configured prefix
+    Returns the tenant-specific prefix (e.g. `"PR-"`) or `null` if not configured.
+    When multiple values exist, the currently active one is preferred.
+
+- **`NumberRangeValueResource`** — read-only resource for `/api/v2/numberRangeValue`.
+  Methods:
+  - `find(string $id): NumberRangeValueDTO`
+  - `findByNumberRange(string $numberRangeId): list<NumberRangeValueDTO>` — all value
+    entries for a given range (multiple can exist for different channels / periods)
+  - `findPrefix(string $numberRangeId): ?string` — prefix of the currently active value
+
+- **`WeclappClient::numberRanges()`** — factory for `NumberRangeResource`.
+- **`WeclappClient::numberRangeValues()`** — factory for `NumberRangeValueResource`.
+
+**Design rationale:** `isProformaInvoice()` was deliberately NOT added to `SalesInvoiceDTO`.
+The API's `salesInvoiceType` enum contains no proforma-specific value, so any detection
+based on that field would permanently return `false`. The only reliable signal is the
+`invoiceNumber` prefix, which is tenant-configurable. Embedding a hardcoded prefix like
+`"PR-"` in the DTO would violate the 1:1 API mirror principle and break silently whenever
+a tenant customises their number range. The correct approach:
+```php
+// Once at startup — cache the result
+$prefix = $client->numberRanges()->getProformaInvoicePrefix(); // e.g. "PR-"
+
+// When processing invoices for DATEV
+$forDatev = array_filter(
+    $client->salesInvoices()->listAll(),
+    fn($inv) => $prefix === null || !str_starts_with($inv->invoiceNumber, $prefix)
+);
+```
+
+---
+
 ### Added — DropshippingFormTextsDTO + DTO field corrections
 
 - **`DropshippingFormTextsDTO`** — new typed DTO for the `dropshippingDeliveryNoteFormTextBlockData`

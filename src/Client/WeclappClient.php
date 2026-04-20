@@ -11,6 +11,8 @@ use miralsoft\weclapp\api\Resource\ArticleResource;
 use miralsoft\weclapp\api\Resource\ContactResource;
 use miralsoft\weclapp\api\Resource\CustomerResource;
 use miralsoft\weclapp\api\Resource\DocumentResource;
+use miralsoft\weclapp\api\Resource\NumberRangeResource;
+use miralsoft\weclapp\api\Resource\NumberRangeValueResource;
 use miralsoft\weclapp\api\Resource\PartyResource;
 use miralsoft\weclapp\api\Resource\PurchaseOrderResource;
 use miralsoft\weclapp\api\Resource\QuotationResource;
@@ -282,5 +284,46 @@ final class WeclappClient
     public function webhooks(): WebhookResource
     {
         return new WebhookResource($this->http, $this->rateLimiter, $this->cache);
+    }
+
+    /**
+     * Returns the Number Range resource for querying document number series.
+     *
+     * Number ranges configure the prefix and counter for each document type
+     * (invoices, orders, proforma, etc.). Use this to resolve the
+     * tenant-specific prefix for proforma invoices before a DATEV export.
+     *
+     * Endpoint: /api/v2/numberRange (read-only)
+     *
+     * @example Retrieve the proforma prefix to exclude proforma invoices:
+     * $prefix   = $client->numberRanges()->getProformaInvoicePrefix(); // e.g. "PR-"
+     * $forDatev = array_filter(
+     *     $client->salesInvoices()->listAll(),
+     *     fn($inv) => $prefix === null || !str_starts_with($inv->invoiceNumber, $prefix)
+     * );
+     */
+    public function numberRanges(): NumberRangeResource
+    {
+        return new NumberRangeResource($this->http, $this->rateLimiter, $this->cache);
+    }
+
+    /**
+     * Returns the Number Range Value resource for querying counter configurations.
+     *
+     * NumberRangeValues hold the concrete prefix, suffix and current counter
+     * for a number range. Multiple values can exist per range (e.g. per sales
+     * channel or validity period).
+     *
+     * Endpoint: /api/v2/numberRangeValue (read-only)
+     *
+     * @example
+     * $values = $client->numberRangeValues()->findByNumberRange($rangeId);
+     * foreach ($values as $value) {
+     *     echo $value->prefix . ' (active: ' . ($value->isCurrentlyActive() ? 'yes' : 'no') . ')';
+     * }
+     */
+    public function numberRangeValues(): NumberRangeValueResource
+    {
+        return new NumberRangeValueResource($this->http, $this->rateLimiter, $this->cache);
     }
 }

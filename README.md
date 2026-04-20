@@ -110,10 +110,15 @@ $config = WeclappConfig::fromArray([
 | `$client->articles()` | `/article` | Products / articles |
 | `$client->articleCategories()` | `/articleCategory` | Article category tree |
 | `$client->salesOrders()` | `/salesOrder` | Sales orders + PDF download |
-| `$client->documents()` | `/document` | File attachments on any entity — query, download, upload |
 | `$client->salesInvoices()` | `/salesInvoice` | Sales invoices + PDF download |
 | `$client->quotations()` | `/quotation` | Quotations + PDF + order conversion |
+| `$client->purchaseOrders()` | `/purchaseOrder` | Purchase orders + PDF download |
+| `$client->shipments()` | `/shipment` | Shipments + delivery note / label PDFs |
+| `$client->tickets()` | `/ticket` | Support tickets |
+| `$client->documents()` | `/document` | File attachments on any entity — query, download, upload |
 | `$client->parties()` | `/party` | Party identity lookup (resolves partyId to name/number) |
+| `$client->numberRanges()` | `/numberRange` | Number range config — read-only |
+| `$client->numberRangeValues()` | `/numberRangeValue` | Number range counters and prefixes — read-only |
 | `$client->webhooks()` | `/webhook` | Event-driven webhook subscriptions |
 
 ---
@@ -406,27 +411,25 @@ $invoices = $client->salesInvoices();
 
 // Find open (unpaid) invoices
 $open = $invoices->findOpen();
-echo $invoice->openAmount;
-echo $invoice->isOpen() ? 'Unpaid' : 'Paid';
 
 // Download invoice PDF
 $pdf = $invoices->getPdf($invoiceId);
 file_put_contents('invoice.pdf', $pdf);
 
-// Resolve the customer display name correctly for ORGANIZATION and PERSON types.
-// The weclapp API does not return a top-level customerName field on invoices,
-// so a party/id/{partyId} lookup is performed automatically when needed.
-// Results are cached in memory — multiple invoices for the same customer
-// produce only one additional API call.
-foreach ($invoices->findOpen() as $invoice) {
-    $name = $invoices->resolveCustomerDisplayName($invoice);
-    // → "Acme Ltd." for an organisation, "John Smith" for a private customer
-    echo $invoice->invoiceNumber . ' — ' . $name . PHP_EOL;
-}
+// Amounts — stored as decimal strings to preserve API precision; use helpers for float
+echo $invoice->netAmount;          // e.g. "1234.56" (?string)
+echo $invoice->getNetAmount();     // 1234.56 (?float)
+echo $invoice->getGrossAmount();   // 1469.13 (?float)
 
-// Quick inline fallback (no extra API call — uses only inline invoice data)
-echo $invoice->getCustomerDisplayName();
-// → customerName (if returned) → customerNumber → 'Unknown'
+// Dates
+echo $invoice->getInvoiceDate()?->format('d.m.Y');
+echo $invoice->getDueDate()?->format('d.m.Y');
+echo $invoice->getBookingDate()?->format('d.m.Y');
+
+// Credit notes (cancellation invoices)
+if ($invoice->isCreditNote()) {
+    echo 'Cancellation of: ' . $invoice->precedingSalesInvoiceId;
+}
 
 // Line items — salesInvoiceItems is a typed list<SalesInvoiceItemDTO>
 foreach ($invoice->salesInvoiceItems as $item) {
@@ -544,6 +547,49 @@ if ($doc !== null) {
 | `cancellationNumber` | Original invoice | CLX-number, e.g. `CLX-1061` |
 | `documentType` | Document attachment | `SALES_INVOICE_CANCELLATION` |
 | `name` | Document attachment | Filename including CLX-number (weclapp-generated) |
+
+### Number Ranges & Proforma Invoice Detection
+
+weclapp assigns every document type its own number series (e.g. `RE-` for invoices, `CLX-` for
+credit notes, `PR-` for proforma invoices). These prefixes are **tenant-configurable** via the
+`/numberRange` and `/numberRangeValue` endpoints.
+
+**Important:** Proforma invoices have **no dedicated `salesInvoiceType` value** in the weclapp API.
+The `salesInvoiceType` enum only contains `STANDARD_INVOICE`, `CREDIT_NOTE`, etc. — never
+`PROFORMA_INVOICE`. Proforma invoices are identified solely by their `invoiceNumber` prefix,
+which comes from the `PROFORMA_INVOICE` number range configuration.
+
+```php
+use miralsoft\weclapp\api\Enum\NumberRangeType;
+
+// --- Fetch the configured proforma prefix (two API calls, cache the result) ---
+$prefix = $client->numberRanges()->getProformaInvoicePrefix();
+// Returns "PR-" (or whatever the tenant has configured), or null if not set up.
+
+// --- Exclude proforma invoices from a DATEV export ---
+$allInvoices = $client->salesInvoices()->listAll();
+$forDatev    = array_filter(
+    $allInvoices,
+    fn($inv) => $prefix === null || !str_starts_with($inv->invoiceNumber, $prefix)
+);
+
+// --- Look up any number range by type ---
+$range = $client->numberRanges()->findByType(NumberRangeType::SalesInvoice);
+echo $range?->type; // "SALES_INVOICE"
+
+// --- Inspect the full counter configuration ---
+$values = $client->numberRangeValues()->findByNumberRange($range->id);
+foreach ($values as $value) {
+    echo $value->prefix;                        // e.g. "RE-"
+    echo $value->lastValue;                     // last issued number
+    echo $value->formatNextNumber();            // e.g. "RE-10043"
+    echo $value->isCurrentlyActive() ? 'active' : 'inactive';
+    echo $value->getValidFrom()?->format('d.m.Y') . ' – ' . $value->getValidTo()?->format('d.m.Y');
+}
+```
+
+> Cache `getProformaInvoicePrefix()` — the prefix almost never changes and the two API
+> calls add unnecessary latency on every sync run.
 
 ### Parties
 
@@ -775,6 +821,7 @@ Use the provided enums to avoid magic string comparisons:
 use miralsoft\weclapp\api\Enum\SalesOrderStatus;
 use miralsoft\weclapp\api\Enum\SalesInvoiceStatus;
 use miralsoft\weclapp\api\Enum\SalesInvoiceType;
+use miralsoft\weclapp\api\Enum\NumberRangeType;
 use miralsoft\weclapp\api\Enum\ItemType;
 use miralsoft\weclapp\api\Enum\InvoicingType;
 use miralsoft\weclapp\api\Enum\QuotationStatus;
@@ -858,6 +905,32 @@ Applies to `SalesOrderItemDTO::$invoicingType` (service items only).
 |---|---|---|
 | `Effort` | `EFFORT` | Billed based on actual recorded effort (time tracking) |
 | `FixedPrice` | `FIXED_PRICE` | Billed at a pre-agreed fixed price regardless of effort |
+
+### `NumberRangeType`
+
+All 45 entity types that have a configurable number series. Key values:
+
+| Case | API value | Typical prefix |
+|---|---|---|
+| `SalesInvoice` | `SALES_INVOICE` | `RE-` |
+| `SalesInvoiceCancellation` | `SALES_INVOICE_CANCELLATION` | `CLX-` |
+| `ProformaInvoice` | `PROFORMA_INVOICE` | `PR-` *(configurable)* |
+| `SalesOrder` | `SALES_ORDER` | `SO-` |
+| `Quotation` | `QUOTATION` | `AN-` |
+| `PurchaseOrder` | `PURCHASE_ORDER` | `BE-` |
+| `PartyCustomer` | `PARTY_CUSTOMER` | `K-` |
+| `Ticket` | `TICKET` | `TI-` |
+
+```php
+// Use with NumberRangeResource::findByType()
+$range = $client->numberRanges()->findByType(NumberRangeType::ProformaInvoice);
+
+// Or filter directly with the string value
+$range = $client->numberRanges()->findByType('PROFORMA_INVOICE');
+```
+
+> All prefixes are tenant-configurable. Never hardcode `"PR-"` — always fetch via
+> `$client->numberRanges()->getProformaInvoicePrefix()`.
 
 ---
 
@@ -1134,21 +1207,22 @@ All 94 fields of the weclapp `article` schema are mapped. Key fields:
 | `orderNumber` | `string` | Human-readable order number (e.g. `SO-10042`) |
 | `status` | `string` | Order status — see `SalesOrderStatus` enum |
 | `customerId` | `string` | ID of the linked customer |
-| `customerNumber` | `?string` | Human-readable customer number |
-| `customerName` | `?string` | Denormalised display name |
-| `customerOrderNumber` | `?string` | Customer's own reference number |
+| `orderNumberAtCustomer` | `?string` | Customer's own reference / order number |
 | `orderDate` | `int` | Order date (epoch ms) |
 | `deliveryDate` | `?int` | Requested delivery date (epoch ms) |
 | `shippingDate` | `?int` | Actual shipping date (epoch ms) |
-| `netAmount`, `grossAmount` | `?float` | Net / gross order amount |
-| `currency` | `?string` | Currency code (e.g. `EUR`) |
+| `netAmount`, `grossAmount` | `?string` | Net / gross order amount (decimal strings) |
+| `recordCurrencyId` | `?string` | Document currency ID (resolve via `/currency/{id}`) |
 | `salesChannel` | `?string` | Assigned sales channel |
 | `responsibleUserId` | `?string` | ID of the responsible weclapp user |
+| `deliveryAddress`, `invoiceAddress`, `recordAddress` | `?RecordAddressDTO` | Embedded addresses |
 | `orderItems` | `list<SalesOrderItemDTO>` | Typed line items — see `SalesOrderItemDTO` |
 | `tags`, `customAttributes` | `array` | Tag and custom attribute objects |
 | `getOrderDate()` | `?DateTimeImmutable` | Order date as object |
 | `getDeliveryDate()` | `?DateTimeImmutable` | Delivery date as object |
 | `getShippingDate()` | `?DateTimeImmutable` | Shipping date as object |
+| `getNetAmount()` | `?float` | Net amount as float |
+| `isFullyFulfilled()` | `bool` | `true` when invoiced, shipped and paid |
 
 ### SalesOrderItemDTO
 
@@ -1206,36 +1280,37 @@ Embedded in `SalesOrderDTO::$orderItems`. Maps the `salesOrderItem` schema.
 
 | Field | Type | Description |
 |---|---|---|
-| `invoiceNumber` | `string` | Human-readable invoice number (e.g. `RE-10042`, `CLX-1061`) |
+| `invoiceNumber` | `string` | Human-readable invoice number (e.g. `RE-10042`, `CLX-1061`, `PR-0042`) |
 | `status` | `string` | Invoice status — see `SalesInvoiceStatus` enum |
 | `salesInvoiceType` | `string` | Invoice type — see `SalesInvoiceType` enum. `CREDIT_NOTE` = cancellation invoice |
 | `customerId` | `string` | ID of the linked customer |
-| `customerNumber` | `?string` | Human-readable customer number (e.g. `K-10042`) |
-| `partyId` | `?string` | ID of the underlying party record — use with `$client->parties()->find()` |
-| `customerName` | `?string` | Denormalised display name — not always returned by the API |
 | `invoiceDate` | `int` | Invoice date (epoch ms) |
 | `dueDate` | `?int` | Payment due date (epoch ms) |
 | `bookingDate` | `?int` | Accounting booking date (epoch ms) |
 | `paymentMethodId` | `?string` | ID of the assigned payment method |
 | `paymentStatus` | `?string` | e.g. `OPEN`, `PAID`, `CLEARED_WITH_CREDIT_NOTE` |
 | `paid` | `bool` | `true` if the invoice has been fully paid |
-| `netAmount`, `grossAmount` | `?float` | Net / gross invoice amount |
-| `openAmount` | `?float` | Remaining unpaid amount |
-| `currency` | `?string` | Currency code (e.g. `EUR`) |
+| `netAmount`, `grossAmount` | `?string` | Net / gross invoice amount (decimal strings) |
+| `netAmountInCompanyCurrency`, `grossAmountInCompanyCurrency` | `?string` | Amounts in company currency |
+| `recordCurrencyId` | `?string` | Document currency ID (resolve via `/currency/{id}`) |
 | `salesOrderId` | `?string` | ID of the originating sales order (if any) |
 | `precedingSalesInvoiceId` | `?string` | For `CREDIT_NOTE`: UUID of the original cancelled invoice |
 | `cancellationNumber` | `?string` | For cancelled invoices: CLX-number of the associated credit note |
+| `orderNumberAtCustomer` | `?string` | Customer's own reference number |
+| `deliveryAddress`, `recordAddress` | `?RecordAddressDTO` | Embedded addresses |
 | `salesInvoiceItems` | `list<SalesInvoiceItemDTO>` | Typed line items — see `SalesInvoiceItemDTO` |
+| `recordEmailAddresses` | `?EmailAddressesDTO` | E-mail address overrides |
 | `tags`, `customAttributes` | `array` | Tag and custom attribute objects |
 | `isCreditNote()` | `bool` | `true` if `salesInvoiceType === 'CREDIT_NOTE'` |
-| `isOpen()` | `bool` | `true` if `openAmount > 0` |
+| `getNetAmount()` | `?float` | Net amount as float |
+| `getGrossAmount()` | `?float` | Gross amount as float |
 | `getInvoiceDate()` | `?DateTimeImmutable` | Invoice date as object |
 | `getDueDate()` | `?DateTimeImmutable` | Due date as object |
 | `getBookingDate()` | `?DateTimeImmutable` | Booking date as object |
-| `getCustomerDisplayName()` | `string` | Best available inline name: `customerName` → `customerNumber` → `'Unknown'` |
 
-> To get a fully resolved display name that correctly handles ORGANIZATION vs. PERSON,
-> use `SalesInvoiceResource::resolveCustomerDisplayName($invoice)` instead.
+> **Proforma invoices** are **not** identified by `salesInvoiceType` — that field never
+> contains a proforma-specific value. Use `$client->numberRanges()->getProformaInvoicePrefix()`
+> to fetch the tenant-configured prefix and check `$invoice->invoiceNumber` against it.
 
 ### SalesInvoiceItemDTO
 
@@ -1293,9 +1368,13 @@ Embedded in `SalesInvoiceDTO::$salesInvoiceItems`. Maps the `salesInvoiceItem` s
 | `quotationNumber` | `string` | Human-readable quotation number |
 | `status` | `string` | Quotation status — see `QuotationStatus` enum |
 | `customerId` | `string` | ID of the linked customer |
-| `netAmount`, `grossAmount` | `?float` | Net / gross quotation amount |
-| `currency` | `?string` | Currency code |
+| `netAmount`, `grossAmount` | `?string` | Net / gross quotation amount (decimal strings) |
+| `recordCurrencyId` | `?string` | Document currency ID (resolve via `/currency/{id}`) |
+| `deliveryAddress`, `invoiceAddress`, `recordAddress` | `?RecordAddressDTO` | Embedded addresses |
 | `quotationItems` | `array` | Raw line item arrays |
+| `getNetAmount()` | `?float` | Net amount as float |
+| `isExpired()` | `bool` | `true` if the quotation validity date has passed |
+| `getValidUntil()` | `?DateTimeImmutable` | Validity date as object |
 
 ---
 
