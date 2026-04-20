@@ -129,6 +129,84 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+### Added — Party / Customer / Contact / Supplier DTOs (full 137-field schema)
+
+- **`BankAccountDTO`** — typed DTO for `bankAccount` entries embedded in the `$bankAccounts`
+  array of all party-based DTOs (PartyDTO, CustomerDTO, ContactDTO, SupplierDTO).
+  All 29 fields of the `bankAccount` schema: identity, `accountHolder`, `accountId`,
+  `accountNumber`, `active`, `autoSync`, `automaticProcessing`, `balance` (decimal string),
+  `bankCode`, `connectionFailure`, `creditInstitute`, `creditInstituteCity/Street/Zip`,
+  `creditLine` (decimal string), `currencyId`, `differentSepaCreditorIdentifier`,
+  `enabledForElectronicPaymentTransactions`, `iban`, `incidentalCostsOfMonetaryTrafficAccountId`,
+  `incidentalCostsOfMonetaryTrafficTaxId`, `lastDownload`, `primary`, `qrIban`, `qrIdentifier`,
+  `swiftBic`. Helper methods: `getBalance()`, `getCreditLine()`, `getLastDownloadAt()`.
+
+- **`OnlineAccountDTO`** — typed DTO for `onlineAccount` entries embedded in `$onlineAccounts`.
+  All 7 fields: identity, `accountName`, `accountType`, `url`.
+
+- **`PartyHabitualExporterLetterOfIntentDTO`** — typed DTO for habitual exporter letters of intent
+  embedded in `$partyHabitualExporterLettersOfIntent`.
+  All 12 fields: identity, `automaticallySuggestInInvoice`, `date`, `fromSupplier`, `invoices` (raw),
+  `numberDeclarer`, `numberSupplier`, `totalAmount`, `type`.
+  Helper methods: `getTotalAmount()`, `getDate()`.
+
+### Changed — Party DTOs Complete Rewrite (137 fields each)
+
+All four party-based DTOs have been rewritten to cover the complete **137-field** `party` schema
+(29 from `abstractParty` + 108 party-specific fields). Every endpoint — `/customer`, `/contact`,
+`/supplier`, `/party` — returns the full party payload; the DTOs now match it exactly.
+
+Nested arrays are now typed:
+- `$addresses` → `list<AddressDTO>`
+- `$bankAccounts` → `list<BankAccountDTO>`
+- `$onlineAccounts` → `list<OnlineAccountDTO>`
+- `$commissionSalesPartners` → `list<CommissionSalesPartnerDTO>`
+- `$partyHabitualExporterLettersOfIntent` → `list<PartyHabitualExporterLetterOfIntentDTO>`
+- `$customAttributes` → `list<CustomAttributeDTO>`
+- `$contacts`, `$partyEmailAddresses`, `$customerSalesStageHistory`, `$tags`, `$topics` → raw `list<array>`
+
+**`PartyDTO`** — rewritten from 10 to 137 fields.
+Added new helper methods: `isCustomer()`, `isSupplier()`, `getDisplayName()`,
+`getCustomerCreditLimit()`, `getBirthDate()`, `getConvertedOnDate()`.
+
+**`CustomerDTO`** — rewritten from 31 to 137 fields.
+
+**Breaking changes** (field renames to match exact API keys):
+- `$mobile` → `$mobilePhone1`
+- `$blocked` → `$customerBlocked`
+- `$insolvent` → `$customerInsolvent`
+- `$salesChannel` → `$customerSalesChannel`
+- `$paymentTermId` → `$customerTermOfPaymentId`
+
+**Removed** fields that do not exist in the `party` schema:
+`$active`, `$currencyName`, `$deliveryTermId`, `$responsibleUserUsername`, `$vatRegistrationNumber`.
+
+New helper methods: `isBlocked()`, `getCustomerCreditLimit()`, `getBirthDate()`.
+
+**`ContactDTO`** — rewritten from 22 to 137 fields.
+
+**Breaking changes**:
+- `$mobile` → `$mobilePhone1`
+- `$customerId` → `$parentPartyId` (ID of the parent organisation)
+
+**Removed** fields that do not exist in the `party` schema: `$active`, `$position`, `$department`.
+Migration: use `$personRoleId` instead of `$position`; use `$personDepartmentId` instead of `$department`.
+
+**`SupplierDTO`** — rewritten from 25 to 137 fields.
+
+**Breaking changes**:
+- `$mobile` → `$mobilePhone1`
+- `$blocked` → `$supplierOrderBlock`
+- `$active` → `$supplierActive`
+- `$paymentTermId` → `$supplierTermOfPaymentId`
+
+**Removed** fields that do not exist in the `party` schema:
+`$currencyName`, `$deliveryTermId`, `$vatRegistrationNumber`.
+
+New helper method: `isActive()`, `getSupplierMinimumPurchaseOrderAmount()`, `getDisplayName()`.
+
+---
+
 ### Added — Article DTOs (full 1:1 API schema coverage)
 
 - **`ArticleImageDTO`** — typed DTO for `articleImage` entries embedded in `ArticleDTO::$articleImages`.

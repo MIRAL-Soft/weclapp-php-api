@@ -278,6 +278,22 @@ $results  = $customers->findByName('Smith');
 
 // Display name (company name for ORGANIZATION, "First Last" for PERSON)
 echo $customer->getDisplayName();
+
+// Correct API field names (party schema, 137 fields total)
+echo $customer->mobilePhone1;           // mobile (API key: mobilePhone1)
+echo $customer->customerNumber;         // e.g. "K-10042"
+echo $customer->vatIdentificationNumber; // VAT ID (was: vatRegistrationNumber)
+echo $customer->customerTermOfPaymentId; // payment terms (was: paymentTermId)
+echo $customer->customerSalesChannel;    // sales channel (was: salesChannel)
+if ($customer->customerBlocked) { ... }  // customer blocked (was: blocked)
+
+// Typed nested arrays
+foreach ($customer->addresses as $address) {       // list<AddressDTO>
+    echo $address->street1 . ', ' . $address->zipcode;
+}
+foreach ($customer->bankAccounts as $bank) {       // list<BankAccountDTO>
+    echo $bank->iban;
+}
 ```
 
 ### Contacts
@@ -285,13 +301,17 @@ echo $customer->getDisplayName();
 ```php
 $contacts = $client->contacts();
 
-// Find all contacts belonging to a customer
+// Find all contacts belonging to a customer (API key: parentPartyId)
 $contacts = $contacts->findByCustomer($customerId);
 
 // Find by email
 $contacts = $contacts->findByEmail('max@acme.de');
 
-echo $contact->getFullName(); // "Max Mustermann"
+echo $contact->getFullName();      // "Max Mustermann"
+echo $contact->mobilePhone1;       // mobile (API key: mobilePhone1)
+echo $contact->parentPartyId;      // parent company ID (was: customerId)
+echo $contact->personRoleId;       // job role ID (was: position)
+echo $contact->personDepartmentId; // department ID (was: department)
 ```
 
 ### Articles
@@ -901,19 +921,134 @@ All API responses are returned as typed, immutable DTOs.
 | `getLastModifiedAt()` | `?DateTimeImmutable` | Last modification date as object |
 | `toArray()` | `array` | Serialise back to associative array |
 
-### CustomerDTO
+### CustomerDTO / ContactDTO / SupplierDTO / PartyDTO
 
-| Field | Type |
-|---|---|
-| `customerNumber` | `string` |
-| `company` | `string` |
-| `partyType` | `string` (`ORGANIZATION` / `PERSON`) |
-| `firstName`, `lastName` | `?string` |
-| `email`, `phone`, `mobile` | `?string` |
-| `active`, `blocked`, `insolvent` | `bool` |
-| `currencyName`, `salesChannel` | `?string` |
-| `addresses`, `contacts`, `customAttributes` | `array` |
-| `getDisplayName()` | `string` |
+All four DTOs map the **137-field** weclapp `party` schema (29 common `abstractParty` fields + 108
+party-specific fields). Each corresponds to a different endpoint:
+
+| DTO | Endpoint | Key identifier field |
+|---|---|---|
+| `CustomerDTO` | `/api/v2/customer` | `$customerNumber` |
+| `ContactDTO` | `/api/v2/contact` | `$parentPartyId` (parent company) |
+| `SupplierDTO` | `/api/v2/supplier` | `$supplierNumber` |
+| `PartyDTO` | `/api/v2/party` | `$customerNumber` or `$supplierNumber` |
+
+**Common / identity fields (all 4 DTOs):**
+
+| Field | Type | Description |
+|---|---|---|
+| `id`, `version` | `string` | UUID and optimistic locking version |
+| `createdDate`, `lastModifiedDate` | `int` | Timestamps (epoch ms) |
+| `partyType` | `?string` | `ORGANIZATION` or `PERSON` |
+| `salutation` | `?string` | Salutation enum |
+| `company`, `company2` | `?string` | Company name lines |
+| `firstName`, `lastName`, `middleName` | `?string` | Person name fields |
+| `birthDate` | `?int` | Date of birth (epoch ms) |
+| `titleId` | `?string` | Academic title ID |
+| `email`, `emailHome` | `?string` | E-mail addresses |
+| `phone`, `phoneHome` | `?string` | Phone numbers |
+| `mobilePhone1`, `mobilePhone2` | `?string` | Mobile phone numbers |
+| `fax`, `fixPhone2` | `?string` | Fax / secondary fixed line |
+| `website` | `?string` | Website URL |
+| `personCompany`, `personDepartmentId`, `personRoleId` | `?string` | Person-specific org fields |
+| `imageId` | `?string` | Profile image ID |
+| `description` | `?string` | Internal notes |
+| `parentPartyId` | `?string` | Parent party / company ID |
+| `primaryContactId` | `?string` | Primary contact ID |
+| `primaryAddressId`, `deliveryAddressId`, `invoiceAddressId`, `dunningAddressId` | `?string` | Address IDs |
+| `currencyId`, `commercialLanguageId` | `?string` | Currency / language |
+| `responsibleUserId` | `?string` | Responsible user ID |
+| `fixedResponsibleUser` | `bool` | Fixed responsible user flag |
+| `taxId`, `vatIdentificationNumber`, `xRechnungLeitwegId`, `eoriNumber` | `?string` | Tax / customs IDs |
+| `factoring`, `commissionBlock`, `invoiceBlock` | `bool` | Block flags |
+| `optInEmail`, `optInLetter`, `optInPhone`, `optInSms` | `bool` | Marketing opt-ins |
+| `salesPartner`, `competitor`, `habitualExporter`, `formerSalesPartner` | `bool` | Party roles |
+| `salesPartnerDefaultCommissionFix`, `salesPartnerDefaultCommissionPercentage` | `?string` | Commission defaults (decimal) |
+| `salesPartnerDefaultCommissionType` | `?string` | Commission type enum |
+| `referenceNumber`, `regionId`, `sectorId`, `companySizeId`, `legalFormId` | `?string` | Classification IDs |
+| `ratingId`, `leadRatingId`, `leadSourceId`, `leadStatus` | `?string` | Lead management |
+| `convertedOnDate` | `?int` | Lead conversion date (epoch ms) |
+| `invoiceRecipientId` | `?string` | Invoice recipient ID |
+| `deliveryEmailAddressesId`, `dunningEmailAddressesId`, `purchaseEmailAddressesId` | `?string` | E-mail group IDs |
+| `quotationEmailAddressesId`, `salesInvoiceEmailAddressesId`, `salesOrderEmailAddressesId` | `?string` | E-mail group IDs |
+| `purchaseViaPlafond`, `enableDropshippingInNewSupplySources` | `bool` | Purchase flags |
+| `publicPageUuid` | `?string` | Public page UUID |
+| `publicPageExpirationDate` | `?int` | Public page expiry (epoch ms) |
+
+**Customer-specific fields (`customer = true`):**
+
+| Field | Type | Description |
+|---|---|---|
+| `customer` | `bool` | Customer role flag |
+| `customerNumber`, `customerNumberOld` | `?string` | Customer numbers |
+| `customerBlocked`, `customerDeliveryBlock`, `customerInsolvent`, `customerInsured` | `bool` | Customer block/status flags |
+| `customerUseCustomsTariffNumber`, `customerAllowDropshippingOrderCreation` | `bool` | Customer options |
+| `customerBusinessType` | `?string` | Business type enum |
+| `customerCategoryId` | `?string` | Category ID |
+| `customerCreditLimit`, `customerAmountInsured`, `customerAnnualRevenue` | `?string` | Amounts (decimal strings) |
+| `customerDefaultHeaderDiscount`, `customerDefaultHeaderSurcharge` | `?string` | Default discounts (decimal) |
+| `customerBlockNotice` | `?string` | Block notice text |
+| `customerCurrentSalesStageId`, `customerLossReasonId` | `?string` | CRM stage IDs |
+| `customerLossDescription`, `customerInternalNote` | `?string` | Notes |
+| `customerDebtorAccountId`, `customerDebtorAccountingCodeId` | `?string` | Accounting IDs |
+| `customerDefaultShippingCarrierId`, `customerDefaultWarehouseId` | `?string` | Logistics defaults |
+| `customerNonStandardTaxId` | `?string` | Non-standard tax ID |
+| `customerPaymentMethodId`, `customerTermOfPaymentId`, `customerShipmentMethodId` | `?string` | Payment / shipping |
+| `customerSalesChannel` | `?string` | Sales channel (distributionChannel enum) |
+| `customerSalesOrderPaymentType` | `?string` | Default payment type enum |
+| `customerSalesProbability` | `?int` | Sales probability 0–100 |
+| `customerSatisfaction` | `?string` | Satisfaction level enum |
+| `customerSupplierNumber` | `?string` | Customer's number in supplier systems |
+| `customerSalesStageHistory` | `array` | Sales stage history (raw) |
+
+**Supplier-specific fields (`supplier = true`):**
+
+| Field | Type | Description |
+|---|---|---|
+| `supplier` | `bool` | Supplier role flag |
+| `supplierActive` | `bool` | Supplier account active flag |
+| `supplierOrderBlock` | `bool` | Order block flag |
+| `supplierMergeItemsForOcrInvoiceUpload` | `bool` | OCR invoice merge flag |
+| `supplierNumber`, `supplierNumberOld` | `?string` | Supplier numbers |
+| `supplierCreditorAccountId`, `supplierCreditorAccountingCodeId` | `?string` | Accounting IDs |
+| `supplierCustomerNumberAtSupplier` | `?string` | Our number at this supplier |
+| `supplierDefaultShippingCarrierId`, `supplierShipmentMethodId` | `?string` | Logistics defaults |
+| `supplierPaymentMethodId`, `supplierTermOfPaymentId` | `?string` | Payment terms |
+| `supplierMinimumPurchaseOrderAmount` | `?string` | Minimum order amount (decimal) |
+| `supplierNonStandardTaxId` | `?string` | Non-standard tax ID |
+| `supplierInternalNote` | `?string` | Internal note |
+
+**Typed nested arrays:**
+
+| Field | Type | Description |
+|---|---|---|
+| `addresses` | `list<AddressDTO>` | Party addresses |
+| `bankAccounts` | `list<BankAccountDTO>` | Bank accounts (29 fields each) |
+| `onlineAccounts` | `list<OnlineAccountDTO>` | Online accounts / social profiles |
+| `commissionSalesPartners` | `list<CommissionSalesPartnerDTO>` | Sales partner commissions |
+| `partyHabitualExporterLettersOfIntent` | `list<PartyHabitualExporterLetterOfIntentDTO>` | Habitual exporter letters |
+| `customAttributes` | `list<CustomAttributeDTO>` | Custom attribute values |
+| `contacts`, `partyEmailAddresses`, `tags`, `topics` | `list<array>` | Raw arrays (no DTO schema) |
+
+**Helper methods (all 4 DTOs):**
+
+| Method | Returns | Description |
+|---|---|---|
+| `getDisplayName()` | `string` | Company name or "First Last" |
+| `getCreatedAt()` | `?DateTimeImmutable` | Creation date |
+| `getLastModifiedAt()` | `?DateTimeImmutable` | Last modification date |
+| `getBirthDate()` | `?DateTimeImmutable` | Date of birth (CustomerDTO/ContactDTO) |
+| `getCustomerCreditLimit()` | `?float` | Credit limit as float (CustomerDTO/PartyDTO) |
+| `isCustomer()` / `isSupplier()` | `bool` | Role check (PartyDTO) |
+| `isBlocked()` | `bool` | `$customerBlocked` shorthand (CustomerDTO) |
+| `isActive()` | `bool` | `$supplierActive && !$supplierOrderBlock` (SupplierDTO) |
+| `getFullName()` | `string` | "First Last" (ContactDTO) |
+
+> **Breaking changes from previous versions:** `$mobile` → `$mobilePhone1`; `$blocked` → `$customerBlocked`
+> (CustomerDTO) or `$supplierOrderBlock` (SupplierDTO); `$active` → `$supplierActive` (SupplierDTO) or removed (CustomerDTO);
+> `$insolvent` → `$customerInsolvent`; `$vatRegistrationNumber` → `$vatIdentificationNumber`/`$taxId`;
+> `$paymentTermId` → `$customerTermOfPaymentId`/`$supplierTermOfPaymentId`; `$salesChannel` → `$customerSalesChannel`;
+> `$customerId` (ContactDTO) → `$parentPartyId`.
 
 ### ArticleDTO
 
@@ -1146,18 +1281,6 @@ Embedded in `SalesInvoiceDTO::$salesInvoiceItems`. Maps the `salesInvoiceItem` s
 | `netAmount`, `grossAmount` | `?float` | Net / gross quotation amount |
 | `currency` | `?string` | Currency code |
 | `quotationItems` | `array` | Raw line item arrays |
-
-### PartyDTO
-
-| Field | Type | Description |
-|---|---|---|
-| `id` | `string` | Internal weclapp UUID |
-| `partyType` | `string` | `ORGANIZATION` or `PERSON` |
-| `customerNumber` | `?string` | Human-readable customer number |
-| `company` | `?string` | Company name (ORGANIZATION) |
-| `firstName`, `lastName` | `?string` | Person name fields (PERSON) |
-| `email` | `?string` | Primary e-mail address |
-| `getDisplayName()` | `string` | Company name or "First Last" depending on `partyType` |
 
 ---
 
