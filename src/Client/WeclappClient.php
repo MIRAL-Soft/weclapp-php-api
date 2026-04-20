@@ -15,6 +15,7 @@ use miralsoft\weclapp\api\Resource\PartyResource;
 use miralsoft\weclapp\api\Resource\QuotationResource;
 use miralsoft\weclapp\api\Resource\SalesInvoiceResource;
 use miralsoft\weclapp\api\Resource\SalesOrderResource;
+use miralsoft\weclapp\api\Resource\ShipmentResource;
 use miralsoft\weclapp\api\Resource\SupplierResource;
 use miralsoft\weclapp\api\Resource\WebhookResource;
 use Psr\Log\LoggerInterface;
@@ -215,12 +216,33 @@ final class WeclappClient
     }
 
     /**
+     * Returns the Shipment resource for CRUD and PDF operations.
+     *
+     * Shipments represent outgoing deliveries created from Sales Orders.
+     * Endpoint: /api/v2/shipment
+     *
+     * @example
+     * $shipments = $client->shipments()->findBySalesOrder($salesOrderId);
+     * $pdf = $client->shipments()->getDeliveryNotePdf($shipment->id);
+     * file_put_contents('delivery-note.pdf', $pdf);
+     */
+    public function shipments(): ShipmentResource
+    {
+        return new ShipmentResource($this->http, $this->rateLimiter, $this->cache);
+    }
+
+    /**
      * Returns the Webhook resource for managing event subscriptions.
      *
      * Endpoint: /api/v2/webhook
      *
      * @example
-     * $client->webhooks()->register('party.updated', 'https://my-app.com/weclapp-events');
+     * $client->webhooks()->register(
+     *     entityName: 'party',
+     *     url: 'https://my-app.com/weclapp-events',
+     *     atCreate: true,
+     *     atUpdate: true,
+     * );
      */
     public function webhooks(): WebhookResource
     {

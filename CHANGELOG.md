@@ -238,6 +238,59 @@ New helper method: `isActive()`, `getSupplierMinimumPurchaseOrderAmount()`, `get
 
 ---
 
+### Added — Shipment Resource (full 61-field schema)
+
+- **`ParcelDTO`** — typed DTO for `parcel` entries embedded in `ShipmentDTO::$parcels`.
+  All 23 fields: identity, `declaredValueAmount` (decimal string), `declaredValueCurrencyId`,
+  DHL service flags (`dhlGoGreenPlusService`, `dhlPostalDeliveredDutyPaidService`, `dhlPremiumInternationalService`),
+  physical dimensions (`height`, `length`, `width` in mm), `weight` (decimal string),
+  `positionNumber`, `reference`, `saturdayDelivery`, `shippingCarrierAddition`, `shippingCarrierId`,
+  `shippingLabelsCount`, `trackingId`, `trackingUrl`, `useDeliveryDateAsPreferredDeliveryDate`,
+  `customAttributes`. Helper methods: `getWeight()`, `getDeclaredValueAmount()`.
+
+- **`ShipmentItemDTO`** — typed DTO for `shipmentItem` entries embedded in `ShipmentDTO::$shipmentItems`.
+  All 30 fields: identity, `addPageBreakBefore`, `articleId`, `description`, `descriptionFixed`,
+  `groupName`, `itemType`, `manualQuantity`, `note`, `parentItemId`, `positionNumber`,
+  `purchaseOrderItemId`, `quantity` (decimal string), `salesOrderItemId`, `title`, `unitId`,
+  return-related fields (`returnAssessmentId`, `returnDescription`, `returnErrorId`, `returnReasonId`,
+  `returnRectificationId`), typed `picks` (`list<ItemPickDTO>`), raw return reference arrays,
+  `customAttributes`. Helper method: `getQuantity()`.
+
+- **`ShipmentDTO`** — typed DTO for the `shipment` schema.
+  All 61 fields: identity, `shipmentNumber`, `status`, `shipmentType`, `mainSalesOrderId`,
+  `creatorId`, `responsibleUserId`, `description`, delivery info fields, logistics references,
+  declared value / customs fields, package tracking fields, weight/dimensions, label counts,
+  record text fields, recipient info, boolean flags, dates.
+  Embedded addresses: `invoiceAddress`, `recipientAddress`, `shippedFromAddress` (typed `?AddressDTO`).
+  Typed nested arrays: `shipmentItems` (`list<ShipmentItemDTO>`), `parcels` (`list<ParcelDTO>`),
+  `customAttributes` (`list<CustomAttributeDTO>`).
+  Typed email objects: `recordEmailAddresses`, `salesInvoiceEmailAddresses` (`?EmailAddressesDTO`).
+  Raw arrays: `purchaseOrders`, `salesOrders`, `statusHistory`, `tags`.
+  Helper methods: `isDispatched()`, `getTrackingUrl()`, `getTotalWeight()`, `getPackageWeight()`,
+  `getShippingDate()`, `getDeliveryDate()`, `getCreatedAt()`, `getLastModifiedAt()`.
+
+- **`ShipmentResource`** — new resource registered as `$client->shipments()`.
+  Methods:
+  - `all(?QueryBuilder $query): list<ShipmentDTO>` — list all shipments
+  - `find(string $id): ShipmentDTO` — fetch by ID
+  - `create(array $data): ShipmentDTO` — create a shipment
+  - `update(string $id, array $data): ShipmentDTO` — update a shipment
+  - `delete(string $id): void` — delete a shipment
+  - `findBySalesOrder(string $salesOrderId): list<ShipmentDTO>` — filter by source order
+  - `findByParty(string $partyId): list<ShipmentDTO>` — filter by recipient party
+  - `getDeliveryNotePdf(string $id): string` — download delivery note PDF
+  - `getPickingListPdf(string $id): string` — download picking list PDF
+  - `getShippingLabelPdf(string $id): string` — download shipping label PDF
+
+- **`WeclappClient::shipments()`** — factory method to create a `ShipmentResource` instance.
+
+### Fixed — SalesInvoiceDTO missing field
+
+- **`SalesInvoiceDTO`** — added missing `$description` field (`?string`). The `salesInvoice`
+  API schema includes a description field that was omitted from the DTO.
+
+---
+
 ### Added — Webhook DTO / Resource Rewrite (correct API schema)
 
 - **`WebhookEntityName` enum** — new string-backed enum listing known weclapp entity names
