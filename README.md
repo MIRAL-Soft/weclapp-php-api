@@ -584,21 +584,32 @@ Webhooks let weclapp notify your application in real time when data changes —
 no polling required.
 
 ```php
+use miralsoft\weclapp\api\Enum\WebhookEntityName;
+
 $webhooks = $client->webhooks();
 
-// Register a new webhook
+// Register a webhook that fires on any party change (create + update + delete)
 $webhook = $webhooks->register(
-    eventType:   'party.updated',                          // triggers on any customer/contact/supplier change
-    callbackUrl: 'https://my-app.example.com/weclapp',    // must be HTTPS and publicly reachable
-    description: 'Sync customer changes to ticket system'
+    entityName: WebhookEntityName::Party->value,           // "party" covers customers, contacts, suppliers
+    url:        'https://my-app.example.com/weclapp',      // publicly reachable URL
+    atCreate:   true,
+    atUpdate:   true,
+    atDelete:   true,
 );
 
-// Available event types:
-// article.created / article.updated / article.deleted
-// salesOrder.created / salesOrder.updated / salesOrder.deleted
-// salesInvoice.created / salesInvoice.updated
-// quotation.created / quotation.updated
-// party.created / party.updated / party.deleted
+// Register a webhook that fires only when a sales order is created
+$webhook = $webhooks->register(
+    entityName: WebhookEntityName::SalesOrder->value,
+    url:        'https://my-app.example.com/weclapp',
+    atCreate:   true,
+);
+
+// Check webhook status
+echo $webhook->entityName;    // e.g. "salesOrder"
+echo $webhook->url;           // the registered URL
+var_dump($webhook->atCreate); // true
+var_dump($webhook->isActive()); // true when deactivatedDate is null
+echo $webhook->errorMessage;  // last delivery error, if any
 
 // List all registered webhooks
 $all = $webhooks->all();
@@ -606,6 +617,9 @@ $all = $webhooks->all();
 // Remove a webhook
 $webhooks->delete($webhook->id);
 ```
+
+Available entity names (see `WebhookEntityName` enum):
+`party`, `article`, `salesOrder`, `salesInvoice`, `quotation`, `purchaseOrder`, `purchaseInvoice`, `shipment`, `contract`, `ticket`
 
 ---
 
@@ -764,7 +778,7 @@ use miralsoft\weclapp\api\Enum\SalesInvoiceType;
 use miralsoft\weclapp\api\Enum\ItemType;
 use miralsoft\weclapp\api\Enum\InvoicingType;
 use miralsoft\weclapp\api\Enum\QuotationStatus;
-use miralsoft\weclapp\api\Enum\WebhookEventType;
+use miralsoft\weclapp\api\Enum\WebhookEntityName;
 
 // Comparing order status
 if (SalesOrderStatus::tryFrom($order->status) === SalesOrderStatus::Confirmed) {
@@ -776,10 +790,11 @@ $confirmed = $client->salesOrders()->list(
     QueryBuilder::new()->filterEq('status', SalesOrderStatus::Confirmed->value)
 );
 
-// Use enum when registering webhooks
+// Use WebhookEntityName when registering webhooks
 $client->webhooks()->register(
-    eventType:   WebhookEventType::PartyUpdated->value,
-    callbackUrl: 'https://my-app.example.com/webhooks/weclapp',
+    entityName: WebhookEntityName::Party->value,
+    url:        'https://my-app.example.com/webhooks/weclapp',
+    atUpdate:   true,
 );
 ```
 

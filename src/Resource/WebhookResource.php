@@ -11,24 +11,34 @@ use miralsoft\weclapp\api\Exception\WeclappApiException;
 /**
  * Resource class for weclapp Webhook management.
  *
- * Allows registering, listing and deleting webhook subscriptions.
+ * Allows registering, listing, updating and deleting webhook subscriptions.
  * Webhooks enable real-time event-driven integration without polling.
  *
- * Supported event types:
- *   - article.created / article.updated / article.deleted
- *   - salesOrder.created / salesOrder.updated / salesOrder.deleted
- *   - salesInvoice.created / salesInvoice.updated
- *   - quotation.created / quotation.updated
- *   - party.created / party.updated / party.deleted  (customers, contacts, suppliers)
+ * Each webhook watches one entity type (entityName) and fires on any combination
+ * of create / update / delete events as configured by the three boolean flags.
  *
- * The callback URL must be publicly reachable via HTTPS.
- * weclapp sends a POST request with the event payload as JSON.
+ * The callback URL must be publicly reachable. weclapp sends a request using
+ * the configured requestMethod ("GET" or "POST", default "POST") with the event
+ * payload as JSON in the body.
+ *
+ * weclapp may automatically deactivate a webhook after repeated delivery failures;
+ * check WebhookDTO::isActive() and WebhookDTO::$errorMessage for status.
  *
  * @example
+ * // Subscribe to all party changes (create + update + delete)
  * $webhook = $client->webhooks()->register(
- *     eventType:   'party.updated',
- *     callbackUrl: 'https://my-app.example.com/webhooks/weclapp',
- *     description: 'Sync customer changes to DocBee'
+ *     entityName: 'party',
+ *     url:        'https://my-app.example.com/webhooks/weclapp',
+ *     atCreate:   true,
+ *     atUpdate:   true,
+ *     atDelete:   true,
+ * );
+ *
+ * // Subscribe to salesOrder creates only
+ * $webhook = $client->webhooks()->register(
+ *     entityName: 'salesOrder',
+ *     url:        'https://my-app.example.com/webhooks/weclapp',
+ *     atCreate:   true,
  * );
  */
 class WebhookResource extends AbstractResource
@@ -39,35 +49,47 @@ class WebhookResource extends AbstractResource
     /**
      * Register a new webhook subscription.
      *
-     * @param string      $eventType   The event type to subscribe to (e.g. "party.updated").
-     * @param string      $callbackUrl The HTTPS URL to deliver events to. Must start with "https://".
-     * @param string|null $description Optional human-readable description.
+     * At least one of $atCreate, $atUpdate, $atDelete must be true.
      *
-     * @throws InvalidArgumentException If the callbackUrl does not use HTTPS.
+     * @param string $entityName     The weclapp entity type to watch (e.g. "party", "salesOrder",
+     *                               "article", "salesInvoice", "quotation").
+     * @param string $url            The URL to deliver events to (max 1000 chars).
+     * @param bool   $atCreate       Fire when an entity of this type is created.
+     * @param bool   $atUpdate       Fire when an entity of this type is updated.
+     * @param bool   $atDelete       Fire when an entity of this type is deleted.
+     * @param string $requestMethod  HTTP method for delivery: "GET" or "POST" (default "POST").
+     *
+     * @throws InvalidArgumentException If no event flag is enabled or requestMethod is invalid.
      * @throws WeclappApiException
      */
-    public function register(string $eventType, string $callbackUrl, ?string $description = null): WebhookDTO
-    {
-        if (!str_starts_with($callbackUrl, 'https://')) {
+    public function register(
+        string $entityName,
+        string $url,
+        bool   $atCreate       = false,
+        bool   $atUpdate       = false,
+        bool   $atDelete       = false,
+        string $requestMethod  = 'POST',
+    ): WebhookDTO {
+        if (!$atCreate && !$atUpdate && !$atDelete) {
             throw new InvalidArgumentException(
-                sprintf(
-                    'Webhook callbackUrl must use HTTPS. Got: "%s".',
-                    $callbackUrl,
-                )
+                'At least one of $atCreate, $atUpdate, $atDelete must be true when registering a webhook.'
             );
         }
 
-        $data = [
-            'eventType'   => $eventType,
-            'callbackUrl' => $callbackUrl,
-            'active'      => true,
-        ];
-
-        if ($description !== null) {
-            $data['description'] = $description;
+        if (!in_array($requestMethod, ['GET', 'POST'], true)) {
+            throw new InvalidArgumentException(
+                sprintf('Invalid requestMethod "%s". Allowed values: "GET", "POST".', $requestMethod)
+            );
         }
 
-        return $this->create($data);
+        return $this->create([
+            'entityName'    => $entityName,
+            'url'           => $url,
+            'atCreate'      => $atCreate,
+            'atUpdate'      => $atUpdate,
+            'atDelete'      => $atDelete,
+            'requestMethod' => $requestMethod,
+        ]);
     }
 
     /**

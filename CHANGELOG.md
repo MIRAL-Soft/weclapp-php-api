@@ -238,6 +238,65 @@ New helper method: `isActive()`, `getSupplierMinimumPurchaseOrderAmount()`, `get
 
 ---
 
+### Added — Webhook DTO / Resource Rewrite (correct API schema)
+
+- **`WebhookEntityName` enum** — new string-backed enum listing known weclapp entity names
+  for use as the `entityName` argument when registering webhook subscriptions.
+  Cases: `Party`, `Article`, `SalesOrder`, `SalesInvoice`, `Quotation`,
+  `PurchaseOrder`, `PurchaseInvoice`, `Shipment`, `Contract`, `Ticket`.
+
+### Changed — Webhook DTO / Resource Rewrite (correct API schema)
+
+- **`WebhookDTO`** — completely rewritten to match the 12-field `webhook` schema.
+
+  **Removed** fields that do not exist in the API:
+  `$active` (no such field — use `isActive()` helper which checks `$deactivatedDate`),
+  `$eventType` (API uses `entityName` + boolean flags, not combined strings),
+  `$description` (no such field),
+  `$callbackUrl` (wrong name).
+
+  **Added** all correct API fields:
+  `$version` (string, readOnly), `$atCreate` (bool), `$atDelete` (bool), `$atUpdate` (bool),
+  `$deactivatedDate` (?int, epoch ms), `$entityName` (string), `$errorMessage` (?string),
+  `$requestMethod` (string: "GET"|"POST"), `$url` (string).
+
+  New helper methods:
+  - `isActive(): bool` — returns `true` when `$deactivatedDate` is `null`
+  - `getDeactivatedAt(): ?DateTimeImmutable`
+
+  **Breaking changes**:
+  - `$callbackUrl` removed → use `$url`
+  - `$active` removed → use `isActive()`
+  - `$eventType` removed → use `$entityName` + `$atCreate`/`$atUpdate`/`$atDelete`
+  - `$description` removed (no equivalent in the API)
+  - `$version` added (required field, now always populated)
+
+- **`WebhookResource::register()`** — signature completely changed to use correct API parameters.
+
+  **Before** (wrong):
+  ```php
+  register(string $eventType, string $callbackUrl, ?string $description = null): WebhookDTO
+  ```
+  **After** (correct):
+  ```php
+  register(
+      string $entityName,
+      string $url,
+      bool   $atCreate      = false,
+      bool   $atUpdate      = false,
+      bool   $atDelete      = false,
+      string $requestMethod = 'POST',
+  ): WebhookDTO
+  ```
+  Validation: throws `InvalidArgumentException` if no event flag is true, or if `$requestMethod`
+  is not `"GET"` or `"POST"`.
+
+- **`WebhookEventType` enum** — marked `@deprecated`. The combined `"entity.action"` string values
+  (e.g. `"party.created"`) do not exist in the weclapp API. Use `WebhookEntityName` instead
+  and pass the boolean flags `atCreate`/`atUpdate`/`atDelete` separately to `register()`.
+
+---
+
 ### Added — Article DTOs (full 1:1 API schema coverage)
 
 - **`ArticleImageDTO`** — typed DTO for `articleImage` entries embedded in `ArticleDTO::$articleImages`.

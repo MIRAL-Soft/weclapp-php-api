@@ -5,15 +5,29 @@ declare(strict_types=1);
 namespace miralsoft\weclapp\api\Enum;
 
 /**
- * Known event type values for weclapp Webhooks.
+ * @deprecated Use WebhookEntityName combined with WebhookResource::register() boolean flags instead.
  *
- * Use these constants when registering webhook subscriptions to avoid typos.
+ * This enum used combined "entity.action" strings (e.g. "party.created") which do not exist
+ * in the weclapp API. The API uses a separate entityName field plus atCreate / atUpdate / atDelete
+ * boolean flags on the webhook record.
  *
- * @example
- * $client->webhooks()->register(
- *     eventType:   WebhookEventType::PartyUpdated->value,
- *     callbackUrl: 'https://my-app.example.com/weclapp-events',
- * );
+ * Migration guide:
+ *
+ *   Before (wrong):
+ *     $client->webhooks()->register(
+ *         eventType:   WebhookEventType::PartyUpdated->value,
+ *         callbackUrl: 'https://my-app.example.com/webhooks/weclapp',
+ *     );
+ *
+ *   After (correct):
+ *     $client->webhooks()->register(
+ *         entityName: WebhookEntityName::Party->value,
+ *         url:        'https://my-app.example.com/webhooks/weclapp',
+ *         atUpdate:   true,
+ *     );
+ *
+ * @see WebhookEntityName
+ * @see \miralsoft\weclapp\api\Resource\WebhookResource::register()
  */
 enum WebhookEventType: string
 {
