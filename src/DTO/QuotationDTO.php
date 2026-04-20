@@ -84,6 +84,7 @@ final class QuotationDTO extends AbstractDTO
      * @param AddressDTO|null  $deliveryAddress           Delivery address for this quotation.
      * @param AddressDTO|null  $invoiceAddress            Invoice address for this quotation.
      * @param AddressDTO|null  $recordAddress             Record address for this quotation.
+     * @param string|null                     $dispatchCountryCode     Country code used for dispatch (enum: country).
      * @param list<QuotationItemDTO>          $quotationItems          Line items of this quotation.
      * @param list<CommissionSalesPartnerDTO> $commissionSalesPartners Commission assignments.
      * @param list<ShippingCostItemDTO>       $shippingCostItems       Shipping cost items.
@@ -91,6 +92,10 @@ final class QuotationDTO extends AbstractDTO
      * @param list<CustomAttributeDTO>        $customAttributes        Custom attribute values.
      * @param list<array>                     $salesStageHistory       Sales stage change history (readOnly, raw).
      * @param list<array>                     $tags                    List of tag objects.
+     * @param EmailAddressesDTO|null          $deliveryEmailAddresses  Delivery e-mail address overrides.
+     * @param EmailAddressesDTO|null          $salesInvoiceEmailAddresses Sales invoice e-mail address overrides.
+     * @param EmailAddressesDTO|null          $recordEmailAddresses    Record e-mail address overrides.
+     * @param EmailAddressesDTO|null          $salesOrderEmailAddresses Sales order e-mail address overrides.
      */
     public function __construct(
         // Identity
@@ -183,6 +188,9 @@ final class QuotationDTO extends AbstractDTO
         public readonly ?AddressDTO $invoiceAddress,
         public readonly ?AddressDTO $recordAddress,
 
+        // Dispatch
+        public readonly ?string     $dispatchCountryCode,
+
         // Nested typed arrays
         public readonly array       $quotationItems,
         public readonly array       $commissionSalesPartners,
@@ -191,6 +199,12 @@ final class QuotationDTO extends AbstractDTO
         public readonly array       $customAttributes,
         public readonly array       $salesStageHistory,
         public readonly array       $tags,
+
+        // Typed email address objects
+        public readonly ?EmailAddressesDTO $deliveryEmailAddresses,
+        public readonly ?EmailAddressesDTO $salesInvoiceEmailAddresses,
+        public readonly ?EmailAddressesDTO $recordEmailAddresses,
+        public readonly ?EmailAddressesDTO $salesOrderEmailAddresses,
     ) {}
 
     /**
@@ -312,6 +326,21 @@ final class QuotationDTO extends AbstractDTO
             ),
             salesStageHistory:           self::arr($data, 'salesStageHistory'),
             tags:                        self::arr($data, 'tags'),
+
+            dispatchCountryCode:         self::strOrNull($data, 'dispatchCountryCode'),
+
+            deliveryEmailAddresses:      isset($data['deliveryEmailAddresses']) && is_array($data['deliveryEmailAddresses'])
+                                             ? EmailAddressesDTO::fromArray($data['deliveryEmailAddresses'])
+                                             : null,
+            salesInvoiceEmailAddresses:  isset($data['salesInvoiceEmailAddresses']) && is_array($data['salesInvoiceEmailAddresses'])
+                                             ? EmailAddressesDTO::fromArray($data['salesInvoiceEmailAddresses'])
+                                             : null,
+            recordEmailAddresses:        isset($data['recordEmailAddresses']) && is_array($data['recordEmailAddresses'])
+                                             ? EmailAddressesDTO::fromArray($data['recordEmailAddresses'])
+                                             : null,
+            salesOrderEmailAddresses:    isset($data['salesOrderEmailAddresses']) && is_array($data['salesOrderEmailAddresses'])
+                                             ? EmailAddressesDTO::fromArray($data['salesOrderEmailAddresses'])
+                                             : null,
         );
     }
 

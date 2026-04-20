@@ -111,7 +111,8 @@ final class SalesInvoiceDTO extends AbstractDTO
      * @param list<CustomAttributeDTO>        $customAttributes         Custom attribute values.
      * @param list<array>                     $salesOrders              Linked sales order references [{id}].
      * @param list<array>                     $tags                     List of tag objects.
-     * @param list<array>                     $recordEmailAddresses     List of record email addresses (raw).
+     * @param EmailAddressesDTO|null          $recordEmailAddresses     Record e-mail address overrides.
+     * @param string|null                     $dispatchCountryCode      Country code used for dispatch (enum: country).
      */
     public function __construct(
         // Identity
@@ -205,8 +206,9 @@ final class SalesInvoiceDTO extends AbstractDTO
         // Other readOnly
         public readonly ?string     $epcQrCodeReference,
 
-        // Logistics
+        // Logistics / dispatch
         public readonly ?string     $customerHabitualExporterLetterOfIntentId,
+        public readonly ?string     $dispatchCountryCode,
         public readonly ?string     $shipmentMethodId,
         public readonly ?string     $termOfPaymentId,
         public readonly ?string     $sepaDirectDebitMandateId,
@@ -234,8 +236,8 @@ final class SalesInvoiceDTO extends AbstractDTO
         public readonly array       $salesOrders,
         public readonly array       $tags,
 
-        // Raw arrays
-        public readonly array       $recordEmailAddresses,
+        // Typed email address object
+        public readonly ?EmailAddressesDTO $recordEmailAddresses,
     ) {}
 
     /**
@@ -332,6 +334,7 @@ final class SalesInvoiceDTO extends AbstractDTO
             epcQrCodeReference:                       self::strOrNull($data, 'epcQrCodeReference'),
 
             customerHabitualExporterLetterOfIntentId: self::strOrNull($data, 'customerHabitualExporterLetterOfIntentId'),
+            dispatchCountryCode:                      self::strOrNull($data, 'dispatchCountryCode'),
             shipmentMethodId:                         self::strOrNull($data, 'shipmentMethodId'),
             termOfPaymentId:                          self::strOrNull($data, 'termOfPaymentId'),
             sepaDirectDebitMandateId:                 self::strOrNull($data, 'sepaDirectDebitMandateId'),
@@ -371,7 +374,9 @@ final class SalesInvoiceDTO extends AbstractDTO
             salesOrders:                              self::arr($data, 'salesOrders'),
             tags:                                     self::arr($data, 'tags'),
 
-            recordEmailAddresses:                     self::arr($data, 'recordEmailAddresses'),
+            recordEmailAddresses:                     isset($data['recordEmailAddresses']) && is_array($data['recordEmailAddresses'])
+                                                          ? EmailAddressesDTO::fromArray($data['recordEmailAddresses'])
+                                                          : null,
         );
     }
 

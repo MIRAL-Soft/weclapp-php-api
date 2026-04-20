@@ -90,7 +90,7 @@ final class SalesOrderDTO extends AbstractDTO
      * @param string|null $recordOpening                         HTML opening text on the record.
      * @param bool        $recordOpeningInheritance              True if the opening is inherited.
      * @param string|null $note                                  Internal note.
-     * @param bool        $dispatchCountryCode                   Country code used for dispatch (kept raw, complex inline).
+     * @param string|null $dispatchCountryCode                   Country code used for dispatch (enum: country).
      * @param AddressDTO|null  $deliveryAddress                  Delivery address for this order.
      * @param AddressDTO|null  $invoiceAddress                   Invoice address for this order.
      * @param AddressDTO|null  $recordAddress                    Record address for this order.
@@ -101,10 +101,10 @@ final class SalesOrderDTO extends AbstractDTO
      * @param list<StatusHistoryDTO>          $statusHistory         Status change history (readOnly).
      * @param list<CustomAttributeDTO>        $customAttributes      Custom attribute values.
      * @param list<array>                     $tags                  List of tag objects.
-     * @param list<array>                     $deliveryEmailAddresses List of delivery email addresses (raw).
-     * @param list<array>                     $recordEmailAddresses   List of record email addresses (raw).
-     * @param list<array>                     $salesInvoiceEmailAddresses List of invoice email addresses (raw).
-     * @param list<array>                     $ecommerceOrder        Linked e-commerce order data (raw).
+     * @param EmailAddressesDTO|null          $deliveryEmailAddresses Delivery e-mail address overrides.
+     * @param EmailAddressesDTO|null          $recordEmailAddresses   Record e-mail address overrides.
+     * @param EmailAddressesDTO|null          $salesInvoiceEmailAddresses Sales invoice e-mail address overrides.
+     * @param EcommerceOrderDTO|null          $ecommerceOrder        Linked e-commerce order metadata.
      * @param list<array>                     $projectMembers        Project members (raw).
      */
     public function __construct(
@@ -205,6 +205,7 @@ final class SalesOrderDTO extends AbstractDTO
         public readonly ?string     $recordOpening,
         public readonly bool        $recordOpeningInheritance,
         public readonly ?string     $note,
+        public readonly ?string     $dispatchCountryCode,
 
         // Addresses
         public readonly ?AddressDTO $deliveryAddress,
@@ -220,12 +221,14 @@ final class SalesOrderDTO extends AbstractDTO
         public readonly array       $customAttributes,
         public readonly array       $tags,
 
-        // Raw arrays (complex inline schemas)
-        public readonly array       $deliveryEmailAddresses,
-        public readonly array       $recordEmailAddresses,
-        public readonly array       $salesInvoiceEmailAddresses,
-        public readonly array       $ecommerceOrder,
-        public readonly array       $projectMembers,
+        // Typed email address objects
+        public readonly ?EmailAddressesDTO  $deliveryEmailAddresses,
+        public readonly ?EmailAddressesDTO  $recordEmailAddresses,
+        public readonly ?EmailAddressesDTO  $salesInvoiceEmailAddresses,
+
+        // Typed e-commerce metadata and raw arrays
+        public readonly ?EcommerceOrderDTO  $ecommerceOrder,
+        public readonly array               $projectMembers,
     ) {}
 
     /**
@@ -332,6 +335,7 @@ final class SalesOrderDTO extends AbstractDTO
             recordOpening:                           self::strOrNull($data, 'recordOpening'),
             recordOpeningInheritance:                self::bool($data, 'recordOpeningInheritance'),
             note:                                    self::strOrNull($data, 'note'),
+            dispatchCountryCode:                     self::strOrNull($data, 'dispatchCountryCode'),
 
             deliveryAddress:                         $deliveryAddress,
             invoiceAddress:                          $invoiceAddress,
@@ -363,10 +367,18 @@ final class SalesOrderDTO extends AbstractDTO
             ),
             tags:                                    self::arr($data, 'tags'),
 
-            deliveryEmailAddresses:                  self::arr($data, 'deliveryEmailAddresses'),
-            recordEmailAddresses:                    self::arr($data, 'recordEmailAddresses'),
-            salesInvoiceEmailAddresses:              self::arr($data, 'salesInvoiceEmailAddresses'),
-            ecommerceOrder:                          self::arr($data, 'ecommerceOrder'),
+            deliveryEmailAddresses:                  isset($data['deliveryEmailAddresses']) && is_array($data['deliveryEmailAddresses'])
+                                                         ? EmailAddressesDTO::fromArray($data['deliveryEmailAddresses'])
+                                                         : null,
+            recordEmailAddresses:                    isset($data['recordEmailAddresses']) && is_array($data['recordEmailAddresses'])
+                                                         ? EmailAddressesDTO::fromArray($data['recordEmailAddresses'])
+                                                         : null,
+            salesInvoiceEmailAddresses:              isset($data['salesInvoiceEmailAddresses']) && is_array($data['salesInvoiceEmailAddresses'])
+                                                         ? EmailAddressesDTO::fromArray($data['salesInvoiceEmailAddresses'])
+                                                         : null,
+            ecommerceOrder:                          isset($data['ecommerceOrder']) && is_array($data['ecommerceOrder'])
+                                                         ? EcommerceOrderDTO::fromArray($data['ecommerceOrder'])
+                                                         : null,
             projectMembers:                          self::arr($data, 'projectMembers'),
         );
     }

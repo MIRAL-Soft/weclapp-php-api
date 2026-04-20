@@ -129,6 +129,37 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+### Added — Document Record DTO Completions
+
+- **`EmailAddressesDTO`** — typed DTO for the `emailAddresses` schema used as e-mail override
+  objects in sales orders, invoices, and quotations.
+  All 3 fields: `bccAddresses`, `ccAddresses`, `toAddresses` (all `list<string>`).
+  Helper methods: `getAllAddresses()`, `isEmpty()`.
+  Replaces raw `list<array>` for `deliveryEmailAddresses`, `recordEmailAddresses`,
+  `salesInvoiceEmailAddresses`, `salesOrderEmailAddresses` fields.
+
+- **`EcommerceOrderDTO`** — typed DTO for the `ecommerceOrder` schema embedded in
+  `SalesOrderDTO::$ecommerceOrder`.
+  All 6 fields: `amazonFeedSubmissionId`, `amazonInvoiceUploadSuccess`,
+  `amazonSalesChannel`, `easyShipped`, `ecommerceId`, `externalConnectionId`.
+  Replaces the previous raw `list<array>` storage.
+
+### Changed — Document DTO Completions
+
+- **`SalesOrderDTO`** — added missing `$dispatchCountryCode` field; changed
+  `$deliveryEmailAddresses`, `$recordEmailAddresses`, `$salesInvoiceEmailAddresses` from
+  `list<array>` to `?EmailAddressesDTO`; changed `$ecommerceOrder` from
+  `list<array>` to `?EcommerceOrderDTO`.
+
+- **`SalesInvoiceDTO`** — added missing `$dispatchCountryCode` field; changed
+  `$recordEmailAddresses` from `list<array>` to `?EmailAddressesDTO`.
+
+- **`QuotationDTO`** — added 5 missing fields: `$dispatchCountryCode`,
+  `$deliveryEmailAddresses`, `$salesInvoiceEmailAddresses`, `$recordEmailAddresses`,
+  `$salesOrderEmailAddresses`. All email address fields typed as `?EmailAddressesDTO`.
+
+---
+
 ### Added — Party / Customer / Contact / Supplier DTOs (full 137-field schema)
 
 - **`BankAccountDTO`** — typed DTO for `bankAccount` entries embedded in the `$bankAccounts`
