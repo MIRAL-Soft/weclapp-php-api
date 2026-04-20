@@ -305,12 +305,31 @@ $article = $articles->findByArticleNumber('ART-001');
 // Find all articles in a category
 $articles = $articles->findByCategory($categoryId);
 
-// Find only in-stock articles
+// Find only in-stock articles (server-side filter via API)
 $inStock  = $articles->findInStock();
 
-echo $article->isInStock() ? 'In stock' : 'Out of stock';
-echo $article->availableStock;
-echo $article->salesPrice;
+// Core fields
+echo $article->articleNumber;
+echo $article->name;
+echo $article->longText;       // long HTML description (API key: longText)
+echo $article->unitId;         // unit of measure ID (resolve via /unit/{id})
+echo $article->articleCategoryId;
+
+// BOM check
+if ($article->isBillOfMaterial()) {
+    foreach ($article->salesBillOfMaterialItems as $component) {
+        echo $component->articleId . ' × ' . $component->getQuantity() . PHP_EOL;
+    }
+}
+
+// Main image
+$image = $article->getMainImage();
+echo $image?->fileName;
+
+// Prices (customer/channel/scale-specific entries)
+foreach ($article->articlePrices as $price) {
+    echo $price->getPrice() . ' ' . $price->currencyId . PHP_EOL;
+}
 ```
 
 ### Article Categories
@@ -324,7 +343,9 @@ $category = $categories->findByName('Electronics');
 // Find only root categories (no parent)
 $roots = $categories->findRootCategories();
 
-echo $category->isRootCategory() ? 'Root' : 'Sub-category of: ' . $category->parentCategoryName;
+echo $category->isRootCategory() ? 'Root' : 'Sub-category';
+echo $category->parentCategoryId; // ID of parent (null for root)
+echo $category->description;
 ```
 
 ### Sales Orders
@@ -896,15 +917,65 @@ All API responses are returned as typed, immutable DTOs.
 
 ### ArticleDTO
 
-| Field | Type |
-|---|---|
-| `articleNumber` | `string` |
-| `name` | `string` |
-| `salesPrice`, `purchasePrice` | `?float` |
-| `availableStock`, `reservedStock` | `?float` |
-| `active`, `sellable`, `stockable` | `bool` |
-| `articleCategoryId`, `unit` | `?string` |
-| `isInStock()` | `bool` |
+All 94 fields of the weclapp `article` schema are mapped. Key fields:
+
+| Field | Type | Description |
+|---|---|---|
+| `articleNumber` | `string` | Unique SKU / article number |
+| `name` | `string` | Short article name |
+| `description` | `?string` | Short HTML description |
+| `longText` | `?string` | Long HTML description (API key: `longText`) |
+| `shortDescription1`, `shortDescription2` | `?string` | Short description lines |
+| `internalNote` | `?string` | Internal HTML note |
+| `matchCode` | `?string` | Alternative search code |
+| `articleType` | `?string` | Article type (enum) |
+| `barcode`, `ean`, `catalogCode` | `?string` | Identification codes |
+| `active` | `bool` | Whether the article is active |
+| `availableInSale` | `bool` | Whether the article can be sold (API key: `availableInSale`) |
+| `serialNumberRequired`, `batchNumberRequired` | `bool` | Tracking requirements |
+| `productionArticle` | `bool` | Whether the article is manufactured in-house |
+| `unitId` | `?string` | Base unit of measure ID (resolve via `/unit/{id}`) |
+| `articleCategoryId` | `?string` | Assigned category ID |
+| `taxRateType`, `invoicingType` | `?string` | Tax and invoicing type enums |
+| `manufacturerId`, `manufacturerPartNumber` | `?string` | Manufacturer data |
+| `customsTariffNumberId`, `countryOfOriginCode` | `?string` | Customs data |
+| `minimumStockQuantity`, `targetStockQuantity` | `?string` | Stock thresholds (decimal strings) |
+| `minimumPurchaseQuantity`, `fixedPurchaseQuantity` | `?string` | Purchase quantities (decimal strings) |
+| `articleGrossWeight`, `articleNetWeight` | `?string` | Weight (decimal strings) |
+| `articleLength`, `articleWidth`, `articleHeight` | `?string` | Dimensions (decimal strings) |
+| `averageDeliveryTime`, `procurementLeadDays` | `int` | Lead times in days |
+| `packagingQuantity` | `int` | Packaging unit size |
+| `launchDate`, `sellFromDate`, `sellByDate`, `supportUntilDate` | `?int` | Lifecycle dates (epoch ms) |
+| `articleImages` | `list<ArticleImageDTO>` | Article images |
+| `articlePrices` | `list<ArticlePriceDTO>` | Sales price entries (customer/channel/scale-specific) |
+| `articleCalculationPrices` | `list<ArticleCalculationPriceDTO>` | Calculation/purchase price entries |
+| `articleAlternativeQuantities` | `list<ArticleAlternativeQuantityDTO>` | Warehouse-specific quantity configs |
+| `customerArticleNumbers` | `list<CustomerSpecificArticleAttributesDTO>` | Customer-specific article numbers |
+| `quantityConversions` | `list<QuantityConversionDTO>` | Unit-of-measure conversions |
+| `supplySources` | `list<SupplySourceDTO>` | Procurement supply sources |
+| `productionBillOfMaterialItems` | `list<BillOfMaterialItemDTO>` | Production BOM components |
+| `salesBillOfMaterialItems` | `list<BillOfMaterialItemDTO>` | Sales BOM components |
+| `customAttributes` | `list<CustomAttributeDTO>` | Custom attribute values |
+| `getMainImage()` | `?ArticleImageDTO` | Returns the main image, or first image |
+| `isBillOfMaterial()` | `bool` | `true` if the article has BOM components |
+
+> Note: `salesPrice`, `purchasePrice`, `availableStock`, `reservedStock` are **not** part of the
+> weclapp OpenAPI `article` schema. Prices are accessed via `articlePrices`; stock levels
+> are available via separate stock endpoints.
+
+### ArticleCategoryDTO
+
+| Field | Type | Description |
+|---|---|---|
+| `name` | `string` | Category display name |
+| `description` | `?string` | Optional description |
+| `parentCategoryId` | `?string` | Parent category ID (null for root categories) |
+| `imageId` | `?string` | Category image ID (readOnly) |
+| `articleAccountingCodeId` | `?string` | Default accounting code for articles |
+| `articleCategoryClassificationId` | `?string` | Classification ID |
+| `costTypeId` | `?string` | Default cost type ID |
+| `salesCostCenterId`, `purchaseCostCenterId` | `?string` | Default cost centre IDs |
+| `isRootCategory()` | `bool` | `true` if `parentCategoryId === null` |
 
 ### SalesOrderDTO
 

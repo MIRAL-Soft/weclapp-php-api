@@ -11,20 +11,26 @@ use DateTimeImmutable;
  *
  * Article categories organise articles into a hierarchical tree structure.
  * They map to the /api/v2/articleCategory endpoint.
+ * All 13 fields of the weclapp OpenAPI articleCategory schema are covered.
  *
  * @see \miralsoft\weclapp\api\Resource\ArticleCategoryResource
  */
 final class ArticleCategoryDTO extends AbstractDTO
 {
     /**
-     * @param string      $id                  Internal weclapp UUID.
-     * @param string      $version             Optimistic locking version string.
-     * @param int         $createdDate         Creation timestamp in epoch milliseconds.
-     * @param int         $lastModifiedDate    Last modification timestamp in epoch milliseconds.
-     * @param string      $name                Display name of the category.
-     * @param bool        $active              Whether the category is active.
-     * @param string|null $parentCategoryId    ID of the parent category (null for root categories).
-     * @param string|null $parentCategoryName  Name of the parent category.
+     * @param string       $id                              Internal weclapp UUID (readOnly).
+     * @param string       $version                         Optimistic locking version string (readOnly).
+     * @param int          $createdDate                     Creation timestamp in epoch milliseconds (readOnly).
+     * @param int          $lastModifiedDate                Last modification timestamp in epoch milliseconds (readOnly).
+     * @param string       $name                            Display name of the category.
+     * @param string|null  $description                     Optional description of the category.
+     * @param string|null  $parentCategoryId                ID of the parent category (null for root categories).
+     * @param string|null  $imageId                         ID of the category image (readOnly).
+     * @param string|null  $articleAccountingCodeId         ID of the default accounting code for articles in this category.
+     * @param string|null  $articleCategoryClassificationId ID of the category classification.
+     * @param string|null  $costTypeId                      ID of the default cost type for articles in this category.
+     * @param string|null  $salesCostCenterId               ID of the default sales cost centre.
+     * @param string|null  $purchaseCostCenterId            ID of the default purchase cost centre.
      */
     public function __construct(
         public readonly string  $id,
@@ -32,9 +38,14 @@ final class ArticleCategoryDTO extends AbstractDTO
         public readonly int     $createdDate,
         public readonly int     $lastModifiedDate,
         public readonly string  $name,
-        public readonly bool    $active,
+        public readonly ?string $description,
         public readonly ?string $parentCategoryId,
-        public readonly ?string $parentCategoryName,
+        public readonly ?string $imageId,
+        public readonly ?string $articleAccountingCodeId,
+        public readonly ?string $articleCategoryClassificationId,
+        public readonly ?string $costTypeId,
+        public readonly ?string $salesCostCenterId,
+        public readonly ?string $purchaseCostCenterId,
     ) {}
 
     /**
@@ -45,14 +56,19 @@ final class ArticleCategoryDTO extends AbstractDTO
     public static function fromArray(array $data): static
     {
         return new static(
-            id:                 self::str($data, 'id'),
-            version:            self::str($data, 'version'),
-            createdDate:        self::int($data, 'createdDate'),
-            lastModifiedDate:   self::int($data, 'lastModifiedDate'),
-            name:               self::str($data, 'name'),
-            active:             self::bool($data, 'active', true),
-            parentCategoryId:   self::strOrNull($data, 'parentCategoryId'),
-            parentCategoryName: self::strOrNull($data, 'parentCategoryName'),
+            id:                              self::str($data, 'id'),
+            version:                         self::str($data, 'version'),
+            createdDate:                     self::int($data, 'createdDate'),
+            lastModifiedDate:                self::int($data, 'lastModifiedDate'),
+            name:                            self::str($data, 'name'),
+            description:                     self::strOrNull($data, 'description'),
+            parentCategoryId:                self::strOrNull($data, 'parentCategoryId'),
+            imageId:                         self::strOrNull($data, 'imageId'),
+            articleAccountingCodeId:         self::strOrNull($data, 'articleAccountingCodeId'),
+            articleCategoryClassificationId: self::strOrNull($data, 'articleCategoryClassificationId'),
+            costTypeId:                      self::strOrNull($data, 'costTypeId'),
+            salesCostCenterId:               self::strOrNull($data, 'salesCostCenterId'),
+            purchaseCostCenterId:            self::strOrNull($data, 'purchaseCostCenterId'),
         );
     }
 

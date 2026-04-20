@@ -129,6 +129,84 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+### Added — Article DTOs (full 1:1 API schema coverage)
+
+- **`ArticleImageDTO`** — typed DTO for `articleImage` entries embedded in `ArticleDTO::$articleImages`.
+  Fields: `id`, `version`, `createdDate`, `lastModifiedDate`, `fileName`, `mainImage`.
+
+- **`ArticlePriceDTO`** — typed DTO for `articlePriceWithoutArticleReference` entries in `ArticleDTO::$articlePrices`.
+  Fields: `id`, `version`, `createdDate`, `lastModifiedDate`, `lastModifiedByUserId`, `price`,
+  `currencyId`, `customerId`, `salesChannel`, `priceScaleType`, `priceScaleValue`,
+  `description`, `startDate`, `endDate`, `reductionAdditions` (raw).
+  Helper methods: `getPrice()`, `getStartDate()`, `getEndDate()`.
+
+- **`ArticleCalculationPriceDTO`** — typed DTO for `articleCalculationPrice` entries in `ArticleDTO::$articleCalculationPrices`.
+  Fields: `id`, `version`, `createdDate`, `lastModifiedDate`, `articleCalculationPriceType`,
+  `price`, `salesChannel`, `startDate`, `endDate`.
+  Helper methods: `getPrice()`, `getStartDate()`, `getEndDate()`.
+
+- **`ArticleAlternativeQuantityDTO`** — typed DTO for alternative warehouse quantity entries in
+  `ArticleDTO::$articleAlternativeQuantities`.
+  Fields: `id`, `version`, `createdDate`, `lastModifiedDate`, `warehouseId`,
+  `minimumOrderQuantity`, `minimumStockQuantity`, `targetStockQuantity`.
+
+- **`CustomerSpecificArticleAttributesDTO`** — typed DTO for customer-article number mappings in
+  `ArticleDTO::$customerArticleNumbers`.
+  Fields: `id`, `version`, `createdDate`, `lastModifiedDate`, `customerId`, `customerArticleNumber`.
+
+- **`QuantityConversionDTO`** — typed DTO for unit-of-measure conversion entries in
+  `ArticleDTO::$quantityConversions`.
+  Fields: `id`, `version`, `createdDate`, `lastModifiedDate`, `createdUserId`, `lastEditedUserId`,
+  `unitId`, `conversionQuantity`, `oppositeDirection`.
+  Helper method: `getConversionQuantity(): ?float`.
+
+- **`SupplySourceDTO`** — typed DTO for procurement source entries in `ArticleDTO::$supplySources`.
+  Fields: `id`, `version`, `createdDate`, `lastModifiedDate`, `articleSupplySourceId`, `positionNumber`.
+
+- **`BillOfMaterialItemDTO`** — typed DTO for BOM component entries used in both
+  `ArticleDTO::$productionBillOfMaterialItems` and `ArticleDTO::$salesBillOfMaterialItems`.
+  Mirrors both the `billOfMaterial` and `salesBillOfMaterialArticleItem` schemas (structurally identical).
+  Fields: `id`, `version`, `createdDate`, `lastModifiedDate`, `articleId`, `quantity`, `positionNumber`.
+  Helper method: `getQuantity(): ?float`.
+
+### Changed — Article DTO Complete Rewrite
+
+- **`ArticleDTO`** — rewritten from 21 fields to the full **94-field** `article` schema.
+  All nested arrays are now typed via dedicated DTOs:
+  - `$articleImages` → `list<ArticleImageDTO>`
+  - `$articlePrices` → `list<ArticlePriceDTO>`
+  - `$articleCalculationPrices` → `list<ArticleCalculationPriceDTO>`
+  - `$articleAlternativeQuantities` → `list<ArticleAlternativeQuantityDTO>`
+  - `$customerArticleNumbers` → `list<CustomerSpecificArticleAttributesDTO>`
+  - `$quantityConversions` → `list<QuantityConversionDTO>`
+  - `$supplySources` → `list<SupplySourceDTO>`
+  - `$productionBillOfMaterialItems` → `list<BillOfMaterialItemDTO>`
+  - `$salesBillOfMaterialItems` → `list<BillOfMaterialItemDTO>`
+  - `$customAttributes` → `list<CustomAttributeDTO>`
+
+  **Breaking changes** — the following fields were renamed to match exact API keys:
+  - `$descriptionLong` → `$longText` (API key: `longText`)
+  - `$unit` → `$unitId` (API key: `unitId`)
+  - `$sellable` → `$availableInSale` (API key: `availableInSale`)
+
+  **Removed** fields that do not exist in the `article` schema:
+  `$articleCategoryName`, `$purchasable`, `$stockable`, `$salesPrice`, `$purchasePrice`,
+  `$availableStock`, `$reservedStock`.
+
+  New helper methods: `getMainImage(): ?ArticleImageDTO`, `isBillOfMaterial(): bool`.
+
+- **`ArticleCategoryDTO`** — rewritten to match the correct 13-field `articleCategory` schema.
+
+  **Removed** fields that do not exist in the `articleCategory` schema:
+  `$active`, `$parentCategoryName`.
+
+  **Added** all missing fields: `$description`, `$imageId`, `$articleAccountingCodeId`,
+  `$articleCategoryClassificationId`, `$costTypeId`, `$salesCostCenterId`, `$purchaseCostCenterId`.
+
+  Retained helper: `isRootCategory(): bool`.
+
+---
+
 ## [1.0.0] — Initial Release (weclapp API v1 → v2 Migration)
 
 ### Added
