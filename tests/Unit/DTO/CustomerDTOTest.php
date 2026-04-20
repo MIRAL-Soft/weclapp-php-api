@@ -4,48 +4,55 @@ declare(strict_types=1);
 
 namespace miralsoft\weclapp\api\Tests\Unit\DTO;
 
+use miralsoft\weclapp\api\DTO\AddressDTO;
 use miralsoft\weclapp\api\DTO\CustomerDTO;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Unit tests for CustomerDTO.
+ * Unit tests for CustomerDTO (137-field party schema).
  */
 class CustomerDTOTest extends TestCase
 {
     private function sampleData(): array
     {
         return [
-            'id'                      => 'abc-123',
-            'version'                 => '3',
-            'createdDate'             => 1711400000000,
-            'lastModifiedDate'        => 1711450000000,
-            'customerNumber'          => 'K-10042',
-            'partyType'               => 'ORGANIZATION',
-            'company'                 => 'Acme GmbH',
-            'salutation'              => 'MR',
-            'title'                   => null,
-            'firstName'               => null,
-            'lastName'                => null,
-            'email'                   => 'info@acme.de',
-            'phone'                   => '+49 30 12345',
-            'mobile'                  => null,
-            'fax'                     => null,
-            'website'                 => 'https://acme.de',
-            'active'                  => true,
-            'blocked'                 => false,
-            'insolvent'               => false,
-            'vatRegistrationNumber'   => 'DE123456789',
-            'currencyId'              => 'eur-id',
-            'currencyName'            => 'EUR',
-            'paymentTermId'           => 'pt-1',
-            'deliveryTermId'          => 'dt-1',
-            'responsibleUserId'       => 'user-1',
-            'responsibleUserUsername' => 'mtosch',
-            'salesChannel'            => 'ONLINE',
-            'addresses'               => [['street1' => 'Hauptstraße 1']],
-            'contacts'                => [],
-            'tags'                    => [],
-            'customAttributes'        => [],
+            'id'               => 'abc-123',
+            'version'          => '3',
+            'createdDate'      => 1711400000000,
+            'lastModifiedDate' => 1711450000000,
+            'customerNumber'   => 'K-10042',
+            'partyType'        => 'ORGANIZATION',
+            'company'          => 'Acme GmbH',
+            'salutation'       => 'MR',
+            'firstName'        => null,
+            'lastName'         => null,
+            'email'            => 'info@acme.de',
+            'phone'            => '+49 30 12345',
+            'mobilePhone1'     => null,
+            'website'          => 'https://acme.de',
+            'customerBlocked'  => false,
+            'customerInsolvent' => false,
+            'currencyId'       => 'eur-id',
+            'responsibleUserId' => 'user-1',
+            'customerSalesChannel' => 'ONLINE',
+            'addresses'        => [
+                [
+                    'id'              => 'addr-1',
+                    'version'         => '1',
+                    'createdDate'     => 1711400000000,
+                    'lastModifiedDate' => 1711400000000,
+                    'street1'         => 'Hauptstraße 1',
+                    'zipcode'         => '10115',
+                    'city'            => 'Berlin',
+                    'countryCode'     => 'DE',
+                    'primaryAddress'  => true,
+                    'deliveryAddress' => false,
+                    'invoiceAddress'  => false,
+                ],
+            ],
+            'contacts'         => [],
+            'tags'             => [],
+            'customAttributes' => [],
         ];
     }
 
@@ -57,10 +64,17 @@ class CustomerDTOTest extends TestCase
         self::assertSame('K-10042', $dto->customerNumber);
         self::assertSame('Acme GmbH', $dto->company);
         self::assertSame('info@acme.de', $dto->email);
-        self::assertTrue($dto->active);
-        self::assertFalse($dto->blocked);
-        self::assertSame('EUR', $dto->currencyName);
+        self::assertFalse($dto->customerBlocked);
+    }
+
+    public function test_addresses_are_hydrated_as_address_dtos(): void
+    {
+        $dto = CustomerDTO::fromArray($this->sampleData());
+
         self::assertCount(1, $dto->addresses);
+        self::assertInstanceOf(AddressDTO::class, $dto->addresses[0]);
+        self::assertSame('Hauptstraße 1', $dto->addresses[0]->street1);
+        self::assertSame('Berlin', $dto->addresses[0]->city);
     }
 
     public function test_get_display_name_returns_company_for_organization(): void
@@ -74,7 +88,7 @@ class CustomerDTOTest extends TestCase
     {
         $data              = $this->sampleData();
         $data['partyType'] = 'PERSON';
-        $data['company']   = '';
+        $data['company']   = null;
         $data['firstName'] = 'Max';
         $data['lastName']  = 'Mustermann';
 
@@ -89,7 +103,6 @@ class CustomerDTOTest extends TestCase
         $dt  = $dto->getCreatedAt();
 
         self::assertNotNull($dt);
-        // Epoch 1711400000000ms = 1711400000s
         self::assertSame(1711400000, $dt->getTimestamp());
     }
 
@@ -101,22 +114,11 @@ class CustomerDTOTest extends TestCase
         self::assertSame(1711450000, $dto->getLastModifiedAt()->getTimestamp());
     }
 
-    public function test_to_array_round_trip(): void
-    {
-        $original = $this->sampleData();
-        $dto      = CustomerDTO::fromArray($original);
-        $array    = $dto->toArray();
-
-        self::assertSame('abc-123', $array['id']);
-        self::assertSame('K-10042', $array['customerNumber']);
-        self::assertSame('Acme GmbH', $array['company']);
-    }
-
     public function test_handles_missing_optional_fields_gracefully(): void
     {
         $dto = CustomerDTO::fromArray([
             'id'              => 'minimal-id',
-            'customerNumber'  => 'K-1',
+            'version'         => '1',
             'createdDate'     => 0,
             'lastModifiedDate' => 0,
         ]);
@@ -124,7 +126,25 @@ class CustomerDTOTest extends TestCase
         self::assertSame('minimal-id', $dto->id);
         self::assertNull($dto->email);
         self::assertNull($dto->phone);
+        self::assertNull($dto->company);
         self::assertSame([], $dto->addresses);
-        self::assertFalse($dto->blocked);
+        self::assertFalse($dto->customerBlocked);
+    }
+
+    public function test_is_blocked_returns_false_by_default(): void
+    {
+        $dto = CustomerDTO::fromArray($this->sampleData());
+
+        self::assertFalse($dto->isBlocked());
+    }
+
+    public function test_is_blocked_returns_true_when_customer_blocked(): void
+    {
+        $data                   = $this->sampleData();
+        $data['customerBlocked'] = true;
+
+        $dto = CustomerDTO::fromArray($data);
+
+        self::assertTrue($dto->isBlocked());
     }
 }

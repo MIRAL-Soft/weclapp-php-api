@@ -33,13 +33,18 @@ class WebhookResourceTest extends TestCase
     private function webhookPayload(string $id = 'wh-1'): array
     {
         return [
-            'id'              => $id,
-            'createdDate'     => 1711400000000,
+            'id'               => $id,
+            'version'          => '1',
+            'createdDate'      => 1711400000000,
             'lastModifiedDate' => 1711400000000,
-            'active'          => true,
-            'eventType'       => 'party.updated',
-            'callbackUrl'     => 'https://my-app.com/weclapp-events',
-            'description'     => 'Sync to DocBee',
+            'atCreate'         => true,
+            'atDelete'         => false,
+            'atUpdate'         => true,
+            'deactivatedDate'  => null,
+            'entityName'       => 'party',
+            'errorMessage'     => null,
+            'requestMethod'    => 'POST',
+            'url'              => 'https://my-app.com/weclapp-events',
         ];
     }
 
@@ -47,15 +52,18 @@ class WebhookResourceTest extends TestCase
     {
         $client  = $this->makeClient([new Response(201, [], json_encode($this->webhookPayload()))]);
         $webhook = $client->webhooks()->register(
-            eventType:   'party.updated',
-            callbackUrl: 'https://my-app.com/weclapp-events',
-            description: 'Sync to DocBee',
+            entityName: 'party',
+            url:        'https://my-app.com/weclapp-events',
+            atCreate:   true,
+            atUpdate:   true,
         );
 
         self::assertInstanceOf(WebhookDTO::class, $webhook);
-        self::assertSame('party.updated', $webhook->eventType);
-        self::assertSame('https://my-app.com/weclapp-events', $webhook->callbackUrl);
-        self::assertTrue($webhook->active);
+        self::assertSame('party', $webhook->entityName);
+        self::assertSame('https://my-app.com/weclapp-events', $webhook->url);
+        self::assertTrue($webhook->atCreate);
+        self::assertTrue($webhook->atUpdate);
+        self::assertFalse($webhook->atDelete);
     }
 
     public function test_all_returns_list_of_webhooks(): void
@@ -82,30 +90,70 @@ class WebhookResourceTest extends TestCase
         $webhook = WebhookDTO::fromArray($this->webhookPayload());
 
         self::assertSame('wh-1', $webhook->id);
-        self::assertSame('party.updated', $webhook->eventType);
-        self::assertSame('Sync to DocBee', $webhook->description);
+        self::assertSame('party', $webhook->entityName);
+        self::assertSame('POST', $webhook->requestMethod);
+        self::assertSame('https://my-app.com/weclapp-events', $webhook->url);
+        self::assertTrue($webhook->atCreate);
+        self::assertFalse($webhook->atDelete);
+        self::assertTrue($webhook->atUpdate);
+        self::assertNull($webhook->deactivatedDate);
+        self::assertNull($webhook->errorMessage);
     }
 
-    public function test_register_throws_on_http_callback_url(): void
+    public function test_webhook_is_active_when_deactivated_date_is_null(): void
+    {
+        $webhook = WebhookDTO::fromArray($this->webhookPayload());
+
+        self::assertTrue($webhook->isActive());
+    }
+
+    public function test_webhook_is_inactive_when_deactivated_date_is_set(): void
+    {
+        $data                    = $this->webhookPayload();
+        $data['deactivatedDate'] = 1711500000000;
+
+        $webhook = WebhookDTO::fromArray($data);
+
+        self::assertFalse($webhook->isActive());
+    }
+
+    public function test_register_throws_when_no_trigger_is_enabled(): void
     {
         $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessageMatches('/https/i');
 
         $client = $this->makeClient([]);
         $client->webhooks()->register(
-            eventType:   'party.updated',
-            callbackUrl: 'http://insecure.example.com/webhook',
+            entityName: 'party',
+            url:        'https://my-app.com/weclapp-events',
         );
     }
 
-    public function test_register_accepts_https_callback_url(): void
+    public function test_register_throws_on_invalid_request_method(): void
     {
-        $client  = $this->makeClient([new Response(201, [], json_encode($this->webhookPayload()))]);
+        $this->expectException(InvalidArgumentException::class);
+
+        $client = $this->makeClient([]);
+        $client->webhooks()->register(
+            entityName:    'party',
+            url:           'https://my-app.com/weclapp-events',
+            atCreate:      true,
+            requestMethod: 'PUT',
+        );
+    }
+
+    public function test_register_accepts_get_request_method(): void
+    {
+        $payload              = $this->webhookPayload();
+        $payload['requestMethod'] = 'GET';
+
+        $client  = $this->makeClient([new Response(201, [], json_encode($payload))]);
         $webhook = $client->webhooks()->register(
-            eventType:   'party.updated',
-            callbackUrl: 'https://secure.example.com/webhook',
+            entityName:    'party',
+            url:           'https://my-app.com/weclapp-events',
+            atCreate:      true,
+            requestMethod: 'GET',
         );
 
-        self::assertInstanceOf(WebhookDTO::class, $webhook);
+        self::assertSame('GET', $webhook->requestMethod);
     }
 }

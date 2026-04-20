@@ -29,7 +29,7 @@ class SalesInvoiceResourceTest extends TestCase
         );
     }
 
-    private function invoicePayload(string $id = 'inv-1', float $openAmount = 0.0): array
+    private function invoicePayload(string $id = 'inv-1'): array
     {
         return [
             'id'               => $id,
@@ -37,14 +37,14 @@ class SalesInvoiceResourceTest extends TestCase
             'createdDate'      => 1711400000000,
             'lastModifiedDate' => 1711450000000,
             'invoiceNumber'    => 'RE-10042',
-            'status'           => 'INVOICE_SENT',
+            'status'           => 'OPEN_ITEM_CREATED',
+            'salesInvoiceType' => 'STANDARD_INVOICE',
             'customerId'       => 'cust-1',
             'invoiceDate'      => 1711400000000,
             'dueDate'          => 1713992000000,
-            'netAmount'        => 100.00,
-            'grossAmount'      => 119.00,
-            'openAmount'       => $openAmount,
-            'invoiceItems'     => [],
+            'netAmount'        => '100.00',
+            'grossAmount'      => '119.00',
+            'salesInvoiceItems' => [],
             'tags'             => [],
             'customAttributes' => [],
         ];
@@ -58,6 +58,7 @@ class SalesInvoiceResourceTest extends TestCase
         self::assertInstanceOf(SalesInvoiceDTO::class, $invoice);
         self::assertSame('RE-10042', $invoice->invoiceNumber);
         self::assertSame('cust-1', $invoice->customerId);
+        self::assertSame('STANDARD_INVOICE', $invoice->salesInvoiceType);
     }
 
     public function test_get_pdf_returns_binary_data(): void
@@ -70,12 +71,12 @@ class SalesInvoiceResourceTest extends TestCase
         self::assertSame($pdfContent, $result);
     }
 
-    public function test_find_open_returns_invoices_with_open_amount(): void
+    public function test_find_open_returns_invoice_list(): void
     {
         $client = $this->makeClient([
             new Response(200, [], json_encode(['result' => [
-                $this->invoicePayload('inv-1', 119.00),
-                $this->invoicePayload('inv-2', 59.50),
+                $this->invoicePayload('inv-1'),
+                $this->invoicePayload('inv-2'),
             ]])),
         ]);
 
@@ -97,18 +98,22 @@ class SalesInvoiceResourceTest extends TestCase
         self::assertSame('cust-1', $invoices[0]->customerId);
     }
 
-    public function test_is_open_returns_true_when_open_amount_positive(): void
+    public function test_is_credit_note_returns_false_for_standard_invoice(): void
     {
-        $invoice = SalesInvoiceDTO::fromArray($this->invoicePayload('inv-1', 50.0));
+        $invoice = SalesInvoiceDTO::fromArray($this->invoicePayload());
 
-        self::assertTrue($invoice->isOpen());
+        self::assertFalse($invoice->isCreditNote());
     }
 
-    public function test_is_open_returns_false_when_fully_paid(): void
+    public function test_is_credit_note_returns_true_for_credit_note(): void
     {
-        $invoice = SalesInvoiceDTO::fromArray($this->invoicePayload('inv-1', 0.0));
+        $data                      = $this->invoicePayload();
+        $data['salesInvoiceType']  = 'CREDIT_NOTE';
+        $data['invoiceNumber']     = 'CLX-1061';
 
-        self::assertFalse($invoice->isOpen());
+        $invoice = SalesInvoiceDTO::fromArray($data);
+
+        self::assertTrue($invoice->isCreditNote());
     }
 
     public function test_due_date_returns_datetime(): void
@@ -126,6 +131,20 @@ class SalesInvoiceResourceTest extends TestCase
 
         self::assertNotNull($invoice->getInvoiceDate());
         self::assertSame(1711400000, $invoice->getInvoiceDate()->getTimestamp());
+    }
+
+    public function test_get_net_amount_returns_float(): void
+    {
+        $invoice = SalesInvoiceDTO::fromArray($this->invoicePayload());
+
+        self::assertSame(100.0, $invoice->getNetAmount());
+    }
+
+    public function test_get_gross_amount_returns_float(): void
+    {
+        $invoice = SalesInvoiceDTO::fromArray($this->invoicePayload());
+
+        self::assertSame(119.0, $invoice->getGrossAmount());
     }
 
     public function test_delete_invoice(): void
