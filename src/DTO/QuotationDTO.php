@@ -27,7 +27,6 @@ final class QuotationDTO extends AbstractDTO
      * @param string      $quotationNumber                Human-readable quotation number (e.g. "ANG-10042").
      * @param string|null $status                         Quotation status (e.g. "QUOTATION_DRAFT", "QUOTATION_SENT").
      * @param string      $customerId                     ID of the linked customer.
-     * @param string|null $customerName                   Customer display name (denormalised).
      * @param int         $quotationDate                  Quotation date in epoch milliseconds.
      * @param string|null $description                    Internal description / comment.
      * @param string|null $responsibleUserId              ID of the responsible weclapp user.
@@ -49,7 +48,6 @@ final class QuotationDTO extends AbstractDTO
      * @param string|null $headerDiscount                 Header-level discount percentage.
      * @param string|null $headerSurcharge                Header-level surcharge percentage.
      * @param string|null $nonStandardTaxId               ID of a non-standard tax rate.
-     * @param string|null $currency                       Currency code (e.g. "EUR").
      * @param string|null $mergedToQuotationId            ID of the quotation this was merged into (readOnly).
      * @param string|null $opportunityId                  ID of the linked opportunity.
      * @param string|null $salesStageId                   ID of the current sales stage.
@@ -108,7 +106,6 @@ final class QuotationDTO extends AbstractDTO
         public readonly string      $quotationNumber,
         public readonly ?string     $status,
         public readonly string      $customerId,
-        public readonly ?string     $customerName,
         public readonly int         $quotationDate,
         public readonly ?string     $description,
         public readonly ?string     $responsibleUserId,
@@ -138,7 +135,6 @@ final class QuotationDTO extends AbstractDTO
         public readonly ?string     $headerDiscount,
         public readonly ?string     $headerSurcharge,
         public readonly ?string     $nonStandardTaxId,
-        public readonly ?string     $currency,
 
         // CRM linkage
         public readonly ?string     $mergedToQuotationId,
@@ -235,7 +231,6 @@ final class QuotationDTO extends AbstractDTO
             quotationNumber:             self::str($data, 'quotationNumber'),
             status:                      self::strOrNull($data, 'status'),
             customerId:                  self::str($data, 'customerId'),
-            customerName:                self::strOrNull($data, 'customerName'),
             quotationDate:               self::int($data, 'quotationDate'),
             description:                 self::strOrNull($data, 'description'),
             responsibleUserId:           self::strOrNull($data, 'responsibleUserId'),
@@ -261,7 +256,6 @@ final class QuotationDTO extends AbstractDTO
             headerDiscount:              self::strOrNull($data, 'headerDiscount'),
             headerSurcharge:             self::strOrNull($data, 'headerSurcharge'),
             nonStandardTaxId:            self::strOrNull($data, 'nonStandardTaxId'),
-            currency:                    self::strOrNull($data, 'currency'),
 
             mergedToQuotationId:         self::strOrNull($data, 'mergedToQuotationId'),
             opportunityId:               self::strOrNull($data, 'opportunityId'),

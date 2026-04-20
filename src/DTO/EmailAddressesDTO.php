@@ -7,12 +7,13 @@ namespace miralsoft\weclapp\api\DTO;
 /**
  * Represents an email addresses configuration object in the weclapp API.
  *
- * Maps to the emailAddresses schema. Used in SalesOrderDTO, SalesInvoiceDTO,
+ * Maps to the `emailAddresses` schema. Used in SalesOrderDTO, SalesInvoiceDTO,
  * and QuotationDTO for delivery, record, sales invoice, and sales order
  * email address overrides.
  *
- * All 3 fields of the weclapp OpenAPI emailAddresses schema are covered.
- * Note: this schema has no identity fields (no id/version/timestamps).
+ * All 3 fields are plain strings (as defined in the OpenAPI spec).
+ * Multiple addresses are stored comma-separated within the string.
+ * This schema has no identity fields (no id/version/timestamps).
  *
  * @see \miralsoft\weclapp\api\DTO\SalesOrderDTO
  * @see \miralsoft\weclapp\api\DTO\SalesInvoiceDTO
@@ -21,14 +22,14 @@ namespace miralsoft\weclapp\api\DTO;
 final class EmailAddressesDTO extends AbstractDTO
 {
     /**
-     * @param list<string> $bccAddresses List of BCC e-mail addresses.
-     * @param list<string> $ccAddresses  List of CC e-mail addresses.
-     * @param list<string> $toAddresses  List of TO (primary recipient) e-mail addresses.
+     * @param string|null $bccAddresses BCC e-mail addresses (comma-separated).
+     * @param string|null $ccAddresses  CC e-mail addresses (comma-separated).
+     * @param string|null $toAddresses  Primary recipient e-mail addresses (comma-separated).
      */
     public function __construct(
-        public readonly array $bccAddresses,
-        public readonly array $ccAddresses,
-        public readonly array $toAddresses,
+        public readonly ?string $bccAddresses,
+        public readonly ?string $ccAddresses,
+        public readonly ?string $toAddresses,
     ) {}
 
     /**
@@ -39,31 +40,39 @@ final class EmailAddressesDTO extends AbstractDTO
     public static function fromArray(array $data): static
     {
         return new static(
-            bccAddresses: self::arr($data, 'bccAddresses'),
-            ccAddresses:  self::arr($data, 'ccAddresses'),
-            toAddresses:  self::arr($data, 'toAddresses'),
+            bccAddresses: self::strOrNull($data, 'bccAddresses'),
+            ccAddresses:  self::strOrNull($data, 'ccAddresses'),
+            toAddresses:  self::strOrNull($data, 'toAddresses'),
         );
     }
 
     /**
-     * Returns all unique e-mail addresses across TO, CC, and BCC.
+     * Returns all unique individual e-mail addresses across TO, CC, and BCC.
+     *
+     * Parses the comma-separated strings and returns a flat, deduplicated list.
      *
      * @return list<string>
      */
     public function getAllAddresses(): array
     {
+        $parse = static fn(?string $v): array => ($v !== null && $v !== '')
+            ? array_map('trim', explode(',', $v))
+            : [];
+
         return array_values(array_unique(array_merge(
-            $this->toAddresses,
-            $this->ccAddresses,
-            $this->bccAddresses,
+            $parse($this->toAddresses),
+            $parse($this->ccAddresses),
+            $parse($this->bccAddresses),
         )));
     }
 
     /**
-     * Returns true if any address is configured in this object.
+     * Returns true if no e-mail address is configured in this object.
      */
     public function isEmpty(): bool
     {
-        return empty($this->toAddresses) && empty($this->ccAddresses) && empty($this->bccAddresses);
+        return ($this->toAddresses === null || $this->toAddresses === '')
+            && ($this->ccAddresses === null || $this->ccAddresses === '')
+            && ($this->bccAddresses === null || $this->bccAddresses === '');
     }
 }

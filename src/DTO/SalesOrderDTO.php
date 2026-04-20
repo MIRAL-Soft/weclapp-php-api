@@ -26,9 +26,6 @@ final class SalesOrderDTO extends AbstractDTO
      * @param string|null $status                                Order status (readOnly).
      * @param string|null $advancePaymentStatus                  Advance payment status (readOnly).
      * @param string      $customerId                            ID of the linked customer.
-     * @param string|null $customerNumber                        Customer number for reference.
-     * @param string|null $customerName                          Customer display name (denormalised).
-     * @param string|null $customerOrderNumber                   Customer's own order reference number.
      * @param int         $orderDate                             Order date in epoch milliseconds.
      * @param string|null $description                           Internal description / comment.
      * @param string|null $responsibleUserId                     ID of the responsible weclapp user.
@@ -119,9 +116,6 @@ final class SalesOrderDTO extends AbstractDTO
         public readonly ?string     $status,
         public readonly ?string     $advancePaymentStatus,
         public readonly string      $customerId,
-        public readonly ?string     $customerNumber,
-        public readonly ?string     $customerName,
-        public readonly ?string     $customerOrderNumber,
         public readonly int         $orderDate,
         public readonly ?string     $description,
         public readonly ?string     $responsibleUserId,
@@ -260,9 +254,6 @@ final class SalesOrderDTO extends AbstractDTO
             status:                                  self::strOrNull($data, 'status'),
             advancePaymentStatus:                    self::strOrNull($data, 'advancePaymentStatus'),
             customerId:                              self::str($data, 'customerId'),
-            customerNumber:                          self::strOrNull($data, 'customerNumber'),
-            customerName:                            self::strOrNull($data, 'customerName'),
-            customerOrderNumber:                     self::strOrNull($data, 'customerOrderNumber'),
             orderDate:                               self::int($data, 'orderDate'),
             description:                             self::strOrNull($data, 'description'),
             responsibleUserId:                       self::strOrNull($data, 'responsibleUserId'),

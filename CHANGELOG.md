@@ -7,6 +7,54 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased] — Branch `WeclappAPIv2`
 
+### Added — DropshippingFormTextsDTO + DTO field corrections
+
+- **`DropshippingFormTextsDTO`** — new typed DTO for the `dropshippingDeliveryNoteFormTextBlockData`
+  schema embedded in `PurchaseOrderDTO::$dropshippingDeliveryNoteFormTexts`.
+  3 fields: `recordComment`, `recordFreeText`, `recordOpening` (all `?string`).
+  Helper: `isEmpty(): bool`.
+
+### Changed — DTO corrections (breaking)
+
+All changes below were driven by a full audit against the OpenAPI spec.
+Any field that was not in the spec has been removed from the corresponding DTO.
+
+- **`EmailAddressesDTO`** — `$bccAddresses`, `$ccAddresses`, `$toAddresses` type changed from
+  `array` to `?string`. The `emailAddresses` schema defines these as plain `string` fields
+  (comma-separated addresses), not arrays.
+  **Breaking**: replace array access with string access; use `getAllAddresses()` to get a
+  split + deduplicated `list<string>`.
+  `getAllAddresses()` now parses comma-separated values internally.
+  `isEmpty()` now checks for null/empty string instead of empty array.
+
+- **`PurchaseOrderDTO::$dropshippingDeliveryNoteFormTexts`** — type changed from `array` to
+  `?DropshippingFormTextsDTO`. The spec defines this field as a single embedded object
+  (`dropshippingDeliveryNoteFormTextBlockData`), not a collection.
+  **Breaking**: access via `->dropshippingDeliveryNoteFormTexts->recordComment` etc.
+
+- **`SalesOrderDTO`** — removed 3 fields that do not exist in the `salesOrder` API schema:
+  - `$customerNumber` — not in spec; was denormalised from the linked customer record
+  - `$customerName` — not in spec; not defined anywhere in the OpenAPI spec
+  - `$customerOrderNumber` — not in spec; correct field is `$orderNumberAtCustomer` (kept)
+  **Breaking**: remove all references to these properties.
+
+- **`SalesInvoiceDTO`** — removed 5 fields that do not exist in the `salesInvoice` API schema:
+  - `$customerNumber` — not in spec
+  - `$partyId` — not in spec for `salesInvoice`
+  - `$customerName` — not in spec
+  - `$openAmount` — not in spec; open-amount data lives in the `salesOpenItem` endpoint
+  - `$currency` — not in spec; use `$recordCurrencyId` to look up the currency
+  Removed helper methods that depended on removed fields:
+  `getCustomerDisplayName()`, `getOpenAmount()`, `isOpen()`.
+  **Breaking**: remove all references to these properties and methods.
+
+- **`QuotationDTO`** — removed 2 fields that do not exist in the `quotation` API schema:
+  - `$customerName` — not in spec
+  - `$currency` — not in spec; use `$recordCurrencyId`
+  **Breaking**: remove all references to these properties.
+
+---
+
 ### Added — RecordAddressDTO (correct schema for embedded document addresses)
 
 - **`RecordAddressDTO`** — new DTO mapping the `recordAddress` schema used for embedded

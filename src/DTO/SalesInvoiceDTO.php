@@ -35,9 +35,6 @@ final class SalesInvoiceDTO extends AbstractDTO
      * @param string      $status                                  Invoice status. See SalesInvoiceStatus enum.
      * @param string      $salesInvoiceType                        Invoice type. See SalesInvoiceType enum.
      * @param string      $customerId                              ID of the linked customer.
-     * @param string|null $customerNumber                          Human-readable customer number.
-     * @param string|null $partyId                                 ID of the underlying party record.
-     * @param string|null $customerName                            Customer display name (denormalised).
      * @param int         $invoiceDate                             Invoice date in epoch milliseconds.
      * @param int|null    $dueDate                                 Payment due date in epoch milliseconds.
      * @param int|null    $bookingDate                             Accounting booking date in epoch milliseconds.
@@ -48,12 +45,10 @@ final class SalesInvoiceDTO extends AbstractDTO
      * @param bool        $paid                                    True if the invoice has been fully paid.
      * @param string|null $netAmount                               Net invoice amount as a decimal string.
      * @param string|null $grossAmount                             Gross invoice amount as a decimal string.
-     * @param string|null $openAmount                              Remaining unpaid amount as a decimal string.
      * @param string|null $netAmountInCompanyCurrency              Net amount in company currency (readOnly).
      * @param string|null $grossAmountInCompanyCurrency            Gross amount in company currency (readOnly).
      * @param string|null $headerDiscount                          Header-level discount percentage.
      * @param string|null $headerSurcharge                         Header-level surcharge percentage.
-     * @param string|null $currency                                Currency code (e.g. "EUR").
      * @param string|null $recordCurrencyId                        ID of the document currency.
      * @param string|null $currencyConversionRate                  Currency conversion rate as a decimal string.
      * @param int|null    $currencyConversionDate                  Date of currency conversion in epoch ms (readOnly).
@@ -127,9 +122,6 @@ final class SalesInvoiceDTO extends AbstractDTO
         public readonly string      $status,
         public readonly string      $salesInvoiceType,
         public readonly string      $customerId,
-        public readonly ?string     $customerNumber,
-        public readonly ?string     $partyId,
-        public readonly ?string     $customerName,
         public readonly int         $invoiceDate,
         public readonly ?int        $dueDate,
         public readonly ?int        $bookingDate,
@@ -144,14 +136,12 @@ final class SalesInvoiceDTO extends AbstractDTO
         // Amounts
         public readonly ?string     $netAmount,
         public readonly ?string     $grossAmount,
-        public readonly ?string     $openAmount,
         public readonly ?string     $netAmountInCompanyCurrency,
         public readonly ?string     $grossAmountInCompanyCurrency,
         public readonly ?string     $headerDiscount,
         public readonly ?string     $headerSurcharge,
 
         // Currency
-        public readonly ?string     $currency,
         public readonly ?string     $recordCurrencyId,
         public readonly ?string     $currencyConversionRate,
         public readonly ?int        $currencyConversionDate,
@@ -267,9 +257,6 @@ final class SalesInvoiceDTO extends AbstractDTO
             status:                                   self::str($data, 'status'),
             salesInvoiceType:                         self::str($data, 'salesInvoiceType'),
             customerId:                               self::str($data, 'customerId'),
-            customerNumber:                           self::strOrNull($data, 'customerNumber'),
-            partyId:                                  self::strOrNull($data, 'partyId'),
-            customerName:                             self::strOrNull($data, 'customerName'),
             invoiceDate:                              self::int($data, 'invoiceDate'),
             dueDate:                                  self::intOrNull($data, 'dueDate'),
             bookingDate:                              self::intOrNull($data, 'bookingDate'),
@@ -282,13 +269,11 @@ final class SalesInvoiceDTO extends AbstractDTO
 
             netAmount:                                self::strOrNull($data, 'netAmount'),
             grossAmount:                              self::strOrNull($data, 'grossAmount'),
-            openAmount:                               self::strOrNull($data, 'openAmount'),
             netAmountInCompanyCurrency:               self::strOrNull($data, 'netAmountInCompanyCurrency'),
             grossAmountInCompanyCurrency:             self::strOrNull($data, 'grossAmountInCompanyCurrency'),
             headerDiscount:                           self::strOrNull($data, 'headerDiscount'),
             headerSurcharge:                          self::strOrNull($data, 'headerSurcharge'),
 
-            currency:                                 self::strOrNull($data, 'currency'),
             recordCurrencyId:                         self::strOrNull($data, 'recordCurrencyId'),
             currencyConversionRate:                   self::strOrNull($data, 'currencyConversionRate'),
             currencyConversionDate:                   self::intOrNull($data, 'currencyConversionDate'),
@@ -448,14 +433,6 @@ final class SalesInvoiceDTO extends AbstractDTO
     }
 
     /**
-     * Returns the open (unpaid) amount as a float, or null if not set.
-     */
-    public function getOpenAmount(): ?float
-    {
-        return $this->openAmount !== null ? (float) $this->openAmount : null;
-    }
-
-    /**
      * Returns true if this invoice is a cancellation invoice (credit note).
      *
      * Cancellation invoices carry a CLX-prefixed invoiceNumber and have their
@@ -466,24 +443,4 @@ final class SalesInvoiceDTO extends AbstractDTO
         return $this->salesInvoiceType === 'CREDIT_NOTE';
     }
 
-    /**
-     * Returns the best available customer display name from inline invoice data.
-     *
-     * Uses the denormalised customerName field if the API returned it.
-     * Falls back to the customerNumber, then to 'Unknown'.
-     */
-    public function getCustomerDisplayName(): string
-    {
-        return $this->customerName
-            ?? $this->customerNumber
-            ?? 'Unknown';
-    }
-
-    /**
-     * Returns true if the invoice has an outstanding open amount.
-     */
-    public function isOpen(): bool
-    {
-        return ($this->getOpenAmount() ?? 0.0) > 0.0;
-    }
 }

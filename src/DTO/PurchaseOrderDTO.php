@@ -88,7 +88,7 @@ final class PurchaseOrderDTO extends AbstractDTO
      * @param list<CustomAttributeDTO>   $customAttributes           Custom attribute values.
      * @param list<array>                $statusHistory              Status change history (raw, readOnly).
      * @param list<array>                $tags                       List of tag objects.
-     * @param list<array>                $dropshippingDeliveryNoteFormTexts Dropshipping delivery note form texts (raw).
+     * @param DropshippingFormTextsDTO|null $dropshippingDeliveryNoteFormTexts Dropshipping delivery note form text overrides.
      * @param EmailAddressesDTO|null     $recordEmailAddresses        Record e-mail address overrides.
      */
     public function __construct(
@@ -182,7 +182,7 @@ final class PurchaseOrderDTO extends AbstractDTO
         public readonly array   $customAttributes,
         public readonly array   $statusHistory,
         public readonly array   $tags,
-        public readonly array   $dropshippingDeliveryNoteFormTexts,
+        public readonly ?DropshippingFormTextsDTO $dropshippingDeliveryNoteFormTexts,
 
         // Typed email address object
         public readonly ?EmailAddressesDTO $recordEmailAddresses,
@@ -295,7 +295,9 @@ final class PurchaseOrderDTO extends AbstractDTO
             ),
             statusHistory:                            self::arr($data, 'statusHistory'),
             tags:                                     self::arr($data, 'tags'),
-            dropshippingDeliveryNoteFormTexts:        self::arr($data, 'dropshippingDeliveryNoteFormTexts'),
+            dropshippingDeliveryNoteFormTexts:        isset($data['dropshippingDeliveryNoteFormTexts']) && is_array($data['dropshippingDeliveryNoteFormTexts'])
+                                                          ? DropshippingFormTextsDTO::fromArray($data['dropshippingDeliveryNoteFormTexts'])
+                                                          : null,
 
             recordEmailAddresses:                     isset($data['recordEmailAddresses']) && is_array($data['recordEmailAddresses'])
                                                           ? EmailAddressesDTO::fromArray($data['recordEmailAddresses'])
