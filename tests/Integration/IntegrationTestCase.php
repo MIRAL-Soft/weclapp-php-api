@@ -49,9 +49,17 @@ abstract class IntegrationTestCase extends TestCase
         $tenant = (string) (getenv('WECLAPP_TENANT') ?: ($_ENV['WECLAPP_TENANT'] ?? ''));
         $token  = (string) (getenv('WECLAPP_TOKEN')  ?: ($_ENV['WECLAPP_TOKEN']  ?? ''));
 
+        // Fallback: derive tenant from WECLAPP_URI (legacy env format).
+        // Supports URIs like https://miralsoft.weclapp.com/webapp/api/v2/
+        if ($tenant === '') {
+            $uri    = (string) (getenv('WECLAPP_URI') ?: ($_ENV['WECLAPP_URI'] ?? ''));
+            $host   = (string) (parse_url($uri, PHP_URL_HOST) ?? '');
+            $tenant = $host !== '' ? (string) explode('.', $host)[0] : '';
+        }
+
         if ($tenant === '' || $token === '') {
             $this->markTestSkipped(
-                'Integration tests require WECLAPP_TENANT and WECLAPP_TOKEN. ' .
+                'Integration tests require WECLAPP_TENANT and WECLAPP_TOKEN (or WECLAPP_URI + WECLAPP_TOKEN). ' .
                 'Copy tests/.env.test.example → tests/.env.test and fill in your credentials.',
             );
         }

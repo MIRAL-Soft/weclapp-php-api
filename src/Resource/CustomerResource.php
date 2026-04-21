@@ -7,13 +7,19 @@ namespace miralsoft\weclapp\api\Resource;
 use miralsoft\weclapp\api\DTO\CustomerDTO;
 use miralsoft\weclapp\api\Exception\NotFoundException;
 use miralsoft\weclapp\api\Exception\WeclappApiException;
+use miralsoft\weclapp\api\Query\FilterOperator;
 use miralsoft\weclapp\api\Query\QueryBuilder;
 
 /**
  * Resource class for weclapp Customer operations.
  *
- * Wraps the /api/v2/customer endpoint and provides all standard CRUD operations
- * plus convenience methods for common lookup patterns.
+ * Wraps the /api/v2/party endpoint (filtered to records with a customerNumber)
+ * and provides all standard CRUD operations plus convenience methods for common
+ * lookup patterns.
+ *
+ * Note: weclapp API v2 exposes all party types (customers, suppliers, contacts)
+ * through the single /party endpoint. CustomerResource automatically restricts
+ * all queries to parties that have a customerNumber set.
  *
  * Delta-sync example (ideal for DocBee or similar integrations):
  *
@@ -29,8 +35,16 @@ use miralsoft\weclapp\api\Query\QueryBuilder;
  */
 class CustomerResource extends AbstractResource
 {
-    protected string $endpoint = 'customer';
+    protected string $endpoint = 'party';
     protected string $dtoClass = CustomerDTO::class;
+
+    /**
+     * Restrict all queries to parties that have a customerNumber (i.e. are actual customers).
+     */
+    protected function applyDefaultFilters(QueryBuilder $query): QueryBuilder
+    {
+        return $query->filter('customerNumber', FilterOperator::NOT_NULL);
+    }
 
     /**
      * Find a customer by their customer number (e.g. "K-10042").

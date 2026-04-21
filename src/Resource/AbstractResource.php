@@ -64,10 +64,10 @@ abstract class AbstractResource
      */
     public function count(?QueryBuilder $query = null): int
     {
-        $queryString = ($query ?? QueryBuilder::new())->buildForCount();
+        $q = $this->applyDefaultFilters(clone ($query ?? QueryBuilder::new()));
 
         $data = $this->rateLimiter->execute(
-            fn () => $this->http->get($this->endpoint . '/count', $queryString)
+            fn () => $this->http->get($this->endpoint . '/count', $q->buildForCount())
         );
 
         return ResponseParser::extractTotalCount($data) ?? 0;
@@ -101,7 +101,7 @@ abstract class AbstractResource
      */
     public function list(?QueryBuilder $query = null): PaginatedResultDTO
     {
-        $q    = $query ?? QueryBuilder::new();
+        $q    = $this->applyDefaultFilters(clone ($query ?? QueryBuilder::new()));
         $data = $this->rateLimiter->execute(
             fn () => $this->http->get($this->endpoint, $q->build())
         );
@@ -336,15 +336,40 @@ abstract class AbstractResource
     }
 
     /**
+     * Inject default filters for this resource type.
+     *
+     * Subclasses can override this to scope all read operations to a specific
+     * subset of records. The base implementation is a no-op.
+     *
+     * Called automatically by count(), list() and cursor() — always receives
+     * a fresh clone so the original caller's QueryBuilder is never mutated.
+     *
+     * @example In CustomerResource:
+     *   protected function applyDefaultFilters(QueryBuilder $query): QueryBuilder
+     *   {
+     *       return $query->filter('customerNumber', FilterOperator::NOT_NULL);
+     *   }
+     */
+    protected function applyDefaultFilters(QueryBuilder $query): QueryBuilder
+    {
+        return $query;
+    }
+
+    /**
      * Build a PSR-16 cache key for the given operation and query.
+     *
+     * Uses the concrete class name (via static::class) so that different
+     * resource types sharing the same API endpoint (e.g. CustomerResource
+     * and SupplierResource both on /party) never produce colliding cache keys.
      *
      * @param string            $operation The operation name (e.g. "listAll").
      * @param QueryBuilder|null $query     The query builder (used for cache busting on different filters).
      */
     protected function buildCacheKey(string $operation, ?QueryBuilder $query): string
     {
-        $queryHash = $query !== null ? md5($query->build()) : 'default';
+        $queryHash    = $query !== null ? md5($query->build()) : 'default';
+        $resourceName = substr(strrchr(static::class, '\\') ?: static::class, 1);
 
-        return sprintf('weclapp.%s.%s.%s', $this->endpoint, $operation, $queryHash);
+        return sprintf('weclapp.%s.%s.%s', $resourceName, $operation, $queryHash);
     }
 }

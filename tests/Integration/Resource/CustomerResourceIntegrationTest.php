@@ -60,13 +60,15 @@ class CustomerResourceIntegrationTest extends IntegrationTestCase
         self::assertSame($id, $customer->id);
     }
 
-    public function test_count_matches_list_total(): void
+    public function test_count_returns_positive_integer(): void
     {
-        $query  = QueryBuilder::new()->pageSize(1);
-        $result = $this->client()->customers()->list($query);
-        $count  = $this->client()->customers()->count($query);
+        // count() calls /party/count and returns the real total.
+        // list().total is NOT the global count — weclapp list responses do not
+        // include a recordCount field, so total falls back to items-on-page.
+        $count = $this->client()->customers()->count();
 
-        self::assertSame($result->total, $count);
+        self::assertIsInt($count);
+        self::assertGreaterThan(0, $count, 'Expected at least one customer in this tenant.');
     }
 
     public function test_modified_since_returns_valid_dtos(): void

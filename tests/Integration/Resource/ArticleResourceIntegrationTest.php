@@ -68,12 +68,14 @@ class ArticleResourceIntegrationTest extends IntegrationTestCase
         $this->client()->articles()->findByArticleNumber('__THIS_ARTICLE_DOES_NOT_EXIST__');
     }
 
-    public function test_count_matches_list_total(): void
+    public function test_count_returns_positive_integer(): void
     {
-        $query  = QueryBuilder::new()->pageSize(1);
-        $result = $this->client()->articles()->list($query);
-        $count  = $this->client()->articles()->count($query);
+        // count() calls /article/count and returns the real total.
+        // list().total is NOT the global count — weclapp list responses do not
+        // include a recordCount field, so total falls back to items-on-page.
+        $count = $this->client()->articles()->count();
 
-        self::assertSame($result->total, $count);
+        self::assertIsInt($count);
+        self::assertGreaterThan(0, $count, 'Expected at least one article in this tenant.');
     }
 }

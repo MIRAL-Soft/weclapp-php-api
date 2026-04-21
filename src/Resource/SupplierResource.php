@@ -6,17 +6,26 @@ namespace miralsoft\weclapp\api\Resource;
 
 use miralsoft\weclapp\api\DTO\SupplierDTO;
 use miralsoft\weclapp\api\Exception\WeclappApiException;
+use miralsoft\weclapp\api\Query\FilterOperator;
 use miralsoft\weclapp\api\Query\QueryBuilder;
 
 /**
  * Resource class for weclapp Supplier operations.
  *
- * Wraps the /api/v2/supplier endpoint.
+ * Wraps the /api/v2/party endpoint (filtered to records with a supplierNumber).
  */
 class SupplierResource extends AbstractResource
 {
-    protected string $endpoint = 'supplier';
+    protected string $endpoint = 'party';
     protected string $dtoClass = SupplierDTO::class;
+
+    /**
+     * Restrict all queries to parties that have a supplierNumber (i.e. are actual suppliers).
+     */
+    protected function applyDefaultFilters(QueryBuilder $query): QueryBuilder
+    {
+        return $query->filter('supplierNumber', FilterOperator::NOT_NULL);
+    }
 
     /**
      * Find suppliers by company name (case-insensitive contains search).

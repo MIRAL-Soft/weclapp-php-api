@@ -133,11 +133,28 @@ class ResponseParserTest extends TestCase
         self::assertSame([], $result);
     }
 
-    public function test_extract_total_count_from_count_endpoint(): void
+    public function test_extract_total_count_from_count_endpoint_v2_format(): void
     {
+        // weclapp API v2 count endpoint returns {"result": 42} (integer, not array)
+        $count = ResponseParser::extractTotalCount(['result' => 99]);
+
+        self::assertSame(99, $count);
+    }
+
+    public function test_extract_total_count_from_count_endpoint_legacy_format(): void
+    {
+        // Legacy / alternative format {"count": 42}
         $count = ResponseParser::extractTotalCount(['count' => 99]);
 
         self::assertSame(99, $count);
+    }
+
+    public function test_extract_total_count_ignores_result_when_it_is_an_array(): void
+    {
+        // List response: {"result": [...], "recordCount": 5} — result is an array, not an integer
+        $count = ResponseParser::extractTotalCount(['result' => [['id' => '1']], 'recordCount' => 5]);
+
+        self::assertSame(5, $count);
     }
 
     public function test_extract_total_count_from_list_endpoint(): void

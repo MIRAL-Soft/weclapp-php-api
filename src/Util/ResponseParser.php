@@ -148,12 +148,18 @@ final class ResponseParser
      */
     public static function extractTotalCount(array $data): ?int
     {
-        // Count endpoint returns {"count": 123}
+        // weclapp API v2 count endpoint returns {"result": 42} where result is an integer.
+        // This differs from the list response where result is an array of records.
+        if (isset($data['result']) && is_int($data['result'])) {
+            return $data['result'];
+        }
+
+        // Legacy / alternative count format {"count": 42}
         if (isset($data['count'])) {
             return (int) $data['count'];
         }
 
-        // List endpoint may return {"recordCount": 123, "result": [...]}
+        // List endpoint returns {"result": [...], "recordCount": 42}
         if (isset($data['recordCount'])) {
             return (int) $data['recordCount'];
         }
