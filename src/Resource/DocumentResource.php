@@ -74,25 +74,20 @@ class DocumentResource extends AbstractResource
         $page     = 1;
         $pageSize = 100;
 
+        // Build the static filter portion from the optional QueryBuilder once
+        // (buildForCount() emits only filter keys, e.g. "type-eq=INVOICE", never
+        //  page/pageSize, so there is no risk of overriding the pagination params)
+        $extraFragment = $extra !== null ? ltrim($extra->buildForCount(), '?') : '';
+
         do {
-            $params = [
+            $baseParams = http_build_query([
                 'entityId'   => $entityId,
                 'entityName' => $entityName,
                 'page'       => $page,
                 'pageSize'   => $pageSize,
-            ];
+            ]);
 
-            // Merge in any extra sort/filter params from QueryBuilder
-            if ($extra !== null) {
-                // Extract filter params only (no page/pageSize override)
-                $extraString = ltrim($extra->buildForCount(), '?');
-                if ($extraString !== '') {
-                    parse_str($extraString, $extraParams);
-                    $params = array_merge($params, $extraParams);
-                }
-            }
-
-            $queryString = '?' . http_build_query($params);
+            $queryString = '?' . $baseParams . ($extraFragment !== '' ? '&' . $extraFragment : '');
 
             $data = $this->rateLimiter->execute(
                 fn () => $this->http->get($this->endpoint, $queryString)
