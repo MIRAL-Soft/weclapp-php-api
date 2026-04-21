@@ -7,6 +7,48 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased] — Branch `WeclappAPIv2`
 
+### Added — Integration test suite (live API tests)
+
+- **`tests/Integration/IntegrationTestCase`** — base class for all live API tests.
+  Loads `tests/.env.test` automatically (gitignored), creates a `WeclappClient` from
+  `WECLAPP_TENANT` + `WECLAPP_TOKEN` env vars, and calls `markTestSkipped()` when
+  credentials are absent — no failures without credentials.
+
+- **`tests/Integration/Resource/CustomerResourceIntegrationTest`** — verifies list,
+  find-by-id, count-matches-total and `modifiedSince` filter against the live API.
+
+- **`tests/Integration/Resource/SalesInvoiceResourceIntegrationTest`** — verifies list,
+  find-by-id, `SalesInvoiceStatus` enum coverage (flags unknown statuses as test failures
+  so new API values are caught early) and count-matches-total.
+
+- **`tests/Integration/Resource/ArticleResourceIntegrationTest`** — verifies list,
+  find-by-article-number, that `NotFoundException` is thrown for unknown numbers and
+  count-matches-total.
+
+- **`tests/Integration/Resource/NumberRangeResourceIntegrationTest`** — verifies that
+  at least one number range exists, that all returned types are known enum values
+  (emits a warning for unknown ones), that values exist for each range and that
+  `isCurrentlyActive()` returns a bool without throwing.
+
+- **`tests/.env.test.example`** — updated template: only `WECLAPP_TENANT` + `WECLAPP_TOKEN`
+  are required (URI is now derived automatically; `WECLAPP_URI` removed).
+
+- **`phpunit.xml`** — `Integration` testsuite added alongside `Unit`. Run selectively:
+  `phpunit --testsuite Unit` (fast, offline) · `phpunit --testsuite Integration` (live).
+
+### Fixed — Security: hardcoded credentials and parse_str() removed
+
+- **`tests/configWeclapp.php`** — hardcoded production API token removed; credentials
+  are now read from `WECLAPP_TENANT` / `WECLAPP_TOKEN` env vars; the v1 URI is derived
+  from the tenant subdomain automatically.
+
+- **`src/Resource/DocumentResource::findByEntity()`** — replaced `parse_str()` round-trip
+  with direct query-string concatenation (`http_build_query` + `&` append). The extra
+  QueryBuilder fragment is built once outside the pagination loop.
+
+- **`.gitignore`** — `tests/.env.test`, `.env`, `.env.*.local`, `phpunit.xml.local` and
+  `.phpunit.result.cache` added so local credential files can never be committed.
+
 ### Added — Number Range support (proforma invoice detection for DATEV)
 
 - **`NumberRangeType` enum** — all 45 entity types that have a configurable number range in

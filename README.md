@@ -970,9 +970,20 @@ $client->articles()->clearCache();
 
 ---
 
-## Testing / Custom HTTP Client
+## Testing
 
-Inject a Guzzle `MockHandler` for unit tests — no real API calls required:
+The test suite is split into two independent layers that can be run separately.
+
+### Unit Tests (default — no credentials needed)
+
+Unit tests use a Guzzle `MockHandler`. No network connection required, runs in ~1–2 s:
+
+```bash
+php vendor/bin/phpunit --testsuite Unit
+# or just: php vendor/bin/phpunit
+```
+
+Inject a mock in your own code the same way:
 
 ```php
 use GuzzleHttp\Client;
@@ -990,6 +1001,46 @@ $client = new WeclappClient($config, guzzle: $guzzle);
 
 $result = $client->customers()->list(); // uses mocked response
 ```
+
+### Integration Tests (live API — run on demand)
+
+Integration tests call the real weclapp API and verify that responses are structured
+as expected. They are read-only — no data is created or modified.
+
+**Setup:**
+
+```bash
+cp tests/.env.test.example tests/.env.test
+# Edit tests/.env.test and fill in your tenant + token
+```
+
+```ini
+# tests/.env.test
+WECLAPP_TENANT=your-tenant   # subdomain of your weclapp URL
+WECLAPP_TOKEN=your-api-token
+```
+
+**Run:**
+
+```bash
+php vendor/bin/phpunit --testsuite Integration
+```
+
+If `tests/.env.test` is missing or credentials are empty, all integration tests are
+automatically **skipped** (not failed) — so running the full suite without credentials is safe:
+
+```bash
+php vendor/bin/phpunit   # Unit: OK · Integration: S (skipped)
+```
+
+**What is tested:**
+
+| Test class | Checks |
+|---|---|
+| `CustomerResourceIntegrationTest` | list, find by ID, count matches total, `modifiedSince` filter |
+| `SalesInvoiceResourceIntegrationTest` | list, find by ID, status maps to known enum, count matches total |
+| `ArticleResourceIntegrationTest` | list, find by number, unknown number throws `NotFoundException`, count |
+| `NumberRangeResourceIntegrationTest` | at least one range exists, all types are known, proforma prefix |
 
 ---
 
