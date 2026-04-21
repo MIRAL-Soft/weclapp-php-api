@@ -21,4 +21,5 @@ enum SalesOrderStatus: string
     case Delivered      = 'ORDER_DELIVERED';
     case Invoiced       = 'ORDER_INVOICED';
     case Cancelled      = 'CANCELLED';
+    case Closed         = 'CLOSED';
 }
