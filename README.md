@@ -303,26 +303,37 @@ foreach ($customer->bankAccounts as $bank) {       // list<BankAccountDTO>
 
 ### Contacts
 
+weclapp embeds contacts in a customer response as stubs — `[{"id": "975300"}]` — with no
+other fields populated. Use `loadFromStubs()` to resolve them to full `ContactDTO` objects:
+
 ```php
-$contacts = $client->contacts();
+// Load a customer — contacts come back as stubs [{"id": "..."}, ...]
+$customer = $client->customers()->find($customerId);
 
-// Find all contacts belonging to a parent organisation (customer or supplier).
-// Pass the party UUID (CustomerDTO::$id / SupplierDTO::$id), not the number.
-$contacts = $contacts->findByParentPartyId($customer->id);
+// Resolve stubs → full ContactDTO objects (one find() call per contact)
+$contacts = $client->contacts()->loadFromStubs($customer->contacts);
 
-// Find by email
-$contacts = $contacts->findByEmail('max@acme.de');
+foreach ($contacts as $contact) {
+    echo $contact->getFullName();       // "Max Mustermann"
+    echo $contact->email;
+    echo $contact->mobilePhone1;        // mobile (API key: mobilePhone1)
+    echo $contact->personRoleId;        // job role ID
+    echo $contact->personDepartmentId;  // department ID
+}
 
-echo $contact->getFullName();      // "Max Mustermann"
-echo $contact->mobilePhone1;       // mobile (API key: mobilePhone1)
-echo $contact->parentPartyId;      // parent company party UUID
-echo $contact->personRoleId;       // job role ID (was: position)
-echo $contact->personDepartmentId; // department ID (was: department)
+// Find by email (server-side filter — works independently of stubs)
+$byEmail = $client->contacts()->findByEmail('max@acme.de');
 ```
 
-> **Migration note:** `findByCustomer()` is deprecated — it filters on the wrong field
-> (`customerId` ≠ party UUID) and returns an empty list for most callers.
-> Use `findByParentPartyId($customer->id)` instead.
+> **Why not filter by parentPartyId?**
+> The weclapp API returns contact objects with `parentPartyId: null` even for linked
+> contacts — the `parentPartyId-eq` filter always returns zero results. `loadFromStubs()`
+> using the IDs from the customer's embedded `contacts` array is the only reliable way
+> to load a customer's contacts.
+
+> **Deprecated methods:** `findByParentPartyId()` (broken — see above) and
+> `findByCustomer()` (wrong filter field) are both `@deprecated` and will be removed
+> in a future major release.
 
 ### Articles
 

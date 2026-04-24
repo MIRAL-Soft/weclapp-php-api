@@ -7,16 +7,42 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased] — Branch `WeclappAPIv2`
 
-### Added — ContactResource::findByParentPartyId()
+### Added — ContactResource::loadFromStubs()
 
-- **`ContactResource::findByParentPartyId(string $parentPartyId): list<ContactDTO>`** —
-  load all contact persons of a parent organisation in one call.
-  Uses `listAll()` internally, so pagination is handled automatically regardless of the
-  contact count. Pass the weclapp party UUID (`CustomerDTO::$id` / `SupplierDTO::$id`),
-  **not** the customer or supplier number.
+- **`ContactResource::loadFromStubs(list<array> $stubs): list<ContactDTO>`** —
+  resolves the raw contact stubs embedded in `CustomerDTO::$contacts` to full
+  `ContactDTO` objects.
+
+  **Background:** The weclapp API embeds contacts in a customer response as stubs —
+  `[{"id": "975300"}]` — with no other fields populated. Filtering via
+  `parentPartyId-eq` does not work either, because weclapp returns contact objects with
+  `parentPartyId: null` even when the contact is linked to a parent organisation.
+  Loading each contact individually by ID via `find()` is the only reliable approach.
 
   ```php
+  $customer  = $client->customers()->find($id);
+  $contacts  = $client->contacts()->loadFromStubs($customer->contacts);
+  // → list<ContactDTO> with all fields populated
+  ```
+
+  Stubs with a missing or malformed `id` key are silently skipped.
+  Stubs whose `find()` call fails (e.g. deleted contact) are also skipped — the
+  remaining contacts are still returned.
+
+### Deprecated — ContactResource::findByParentPartyId()
+
+- **`ContactResource::findByParentPartyId(string $parentPartyId)`** — marked `@deprecated`.
+  Verified non-functional: the weclapp API returns contact party objects with
+  `parentPartyId: null` even for contacts that are genuinely linked to a parent
+  organisation. The `parentPartyId-eq` filter therefore always returns zero results.
+
+  **Use `loadFromStubs()` instead** — pass `CustomerDTO::$contacts` directly:
+  ```php
+  // Before — always returns [] in practice:
   $contacts = $client->contacts()->findByParentPartyId($customer->id);
+
+  // After — correct:
+  $contacts = $client->contacts()->loadFromStubs($customer->contacts);
   ```
 
 ### Deprecated — ContactResource::findByCustomer()
@@ -26,17 +52,17 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   of the parent organisation. Callers who pass `CustomerDTO::$id` (the party UUID)
   silently receive an empty list in most tenants.
 
-  **Migration** (no behavioural change for the correct use-case):
+  **Use `loadFromStubs()` instead:**
   ```php
-  // Before — broken when $customer->id is the party UUID:
+  // Before (broken):
   $contacts = $client->contacts()->findByCustomer($customer->id);
 
-  // After — correct:
-  $contacts = $client->contacts()->findByParentPartyId($customer->id);
+  // After (correct):
+  $contacts = $client->contacts()->loadFromStubs($customer->contacts);
   ```
 
-  The method is retained for backward compatibility and will be removed in a future
-  major release.
+  Both deprecated methods are retained for backward compatibility and will be removed
+  in a future major release.
 
 ### Fixed — Enum gaps discovered by live integration tests
 

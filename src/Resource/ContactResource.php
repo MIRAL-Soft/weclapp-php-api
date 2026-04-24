@@ -51,13 +51,40 @@ class ContactResource extends AbstractResource
     }
 
     /**
-     * Find all contacts linked to a given parent organisation party.
+     * Loads full ContactDTO objects from weclapp customer contact stubs.
      *
-     * weclapp stores the link via the `parentPartyId` field on the contact party.
-     * The parent is typically a customer or supplier organisation party.
+     * When fetching a customer from the weclapp API, the `contacts` field contains
+     * only stub objects with a single `id` key — no other fields are populated.
+     * This method resolves each stub to a full ContactDTO by calling find() individually.
      *
-     * Use this to load all contacts of a customer by passing the customer's
-     * weclapp UUID (`CustomerDTO::$id`), not the customer number.
+     * Note: Filtering contacts via `parentPartyId-eq` does NOT work because weclapp
+     * returns contact objects with `parentPartyId: null`, even when the contact is
+     * linked to a parent organisation. Loading by ID is the only reliable approach.
+     *
+     * @param list<array> $stubs  The raw stubs from CustomerDTO::$contacts.
+     * @return list<ContactDTO>
+     */
+    public function loadFromStubs(array $stubs): array
+    {
+        $result = [];
+        foreach ($stubs as $stub) {
+            if (!is_array($stub) || !isset($stub['id'])) {
+                continue;
+            }
+            try {
+                $result[] = $this->find($stub['id']);
+            } catch (WeclappApiException) {
+                // Stub refers to a contact that no longer exists — skip silently.
+            }
+        }
+        return $result;
+    }
+
+    /**
+     * @deprecated Does not work reliably. The weclapp API returns contact objects
+     *             with `parentPartyId: null` even for linked contacts, so this filter
+     *             always returns zero results. Use {@see loadFromStubs()} instead,
+     *             passing CustomerDTO::$contacts.
      *
      * @param string $parentPartyId The weclapp UUID of the parent organisation.
      * @return list<ContactDTO>
@@ -82,16 +109,17 @@ class ContactResource extends AbstractResource
      *   field that is rarely populated on contact records. Passing `CustomerDTO::$id`
      *   (the party UUID) here will silently return an empty list in most tenants.
      *
-     *   **Use {@see findByParentPartyId()} instead:**
+     *   **Use {@see loadFromStubs()} instead:**
      *   ```php
      *   // Before (broken for most callers):
      *   $contacts = $client->contacts()->findByCustomer($customer->id);
      *
      *   // After (correct):
-     *   $contacts = $client->contacts()->findByParentPartyId($customer->id);
+     *   $contacts = $client->contacts()->loadFromStubs($customer->contacts);
      *   ```
-     *   `parentPartyId` is the field weclapp uses to link a contact person to its
-     *   parent organisation party, and `CustomerDTO::$id` is exactly that party UUID.
+     *   `CustomerDTO::$contacts` contains the raw stubs `[["id" => "..."], ...]`
+     *   that weclapp embeds in the customer response. `loadFromStubs()` resolves
+     *   each stub to a full `ContactDTO` via individual `find()` calls.
      *
      * @param string $customerId Internal customer-assignment ID (NOT the party UUID).
      * @return list<ContactDTO>

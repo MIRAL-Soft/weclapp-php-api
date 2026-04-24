@@ -50,6 +50,90 @@ class ContactResourceTest extends TestCase
     }
 
     // -------------------------------------------------------------------------
+    // loadFromStubs
+    // -------------------------------------------------------------------------
+
+    public function test_load_from_stubs_resolves_each_stub_via_find(): void
+    {
+        // Two stubs → two individual GET /party/id/{id} calls
+        $client = $this->makeClient([
+            new Response(200, [], json_encode($this->contactPayload('c-1'))),
+            new Response(200, [], json_encode($this->contactPayload('c-2'))),
+        ]);
+
+        $contacts = $client->contacts()->loadFromStubs([
+            ['id' => 'c-1'],
+            ['id' => 'c-2'],
+        ]);
+
+        self::assertCount(2, $contacts);
+        self::assertContainsOnlyInstancesOf(ContactDTO::class, $contacts);
+        self::assertSame('c-1', $contacts[0]->id);
+        self::assertSame('c-2', $contacts[1]->id);
+    }
+
+    public function test_load_from_stubs_returns_empty_array_for_empty_input(): void
+    {
+        $client = $this->makeClient([]); // no HTTP calls expected
+
+        $contacts = $client->contacts()->loadFromStubs([]);
+
+        self::assertSame([], $contacts);
+    }
+
+    public function test_load_from_stubs_skips_malformed_stubs_without_id(): void
+    {
+        // Only the valid stub triggers an HTTP call
+        $client = $this->makeClient([
+            new Response(200, [], json_encode($this->contactPayload('c-1'))),
+        ]);
+
+        $contacts = $client->contacts()->loadFromStubs([
+            ['id' => 'c-1'],        // valid
+            [],                     // no 'id' key → skipped
+            ['name' => 'foo'],      // no 'id' key → skipped
+            'not-an-array',         // not an array → skipped
+        ]);
+
+        self::assertCount(1, $contacts);
+        self::assertSame('c-1', $contacts[0]->id);
+    }
+
+    public function test_load_from_stubs_skips_stub_when_find_throws(): void
+    {
+        // First contact returns 404, second succeeds
+        $client = $this->makeClient([
+            new Response(404, [], json_encode(['error' => 'not found'])),
+            new Response(200, [], json_encode($this->contactPayload('c-2'))),
+        ]);
+
+        $contacts = $client->contacts()->loadFromStubs([
+            ['id' => 'c-deleted'],  // 404 → silently skipped
+            ['id' => 'c-2'],        // still returned
+        ]);
+
+        self::assertCount(1, $contacts);
+        self::assertSame('c-2', $contacts[0]->id);
+    }
+
+    public function test_load_from_stubs_returns_all_contacts_when_all_found(): void
+    {
+        $client = $this->makeClient([
+            new Response(200, [], json_encode($this->contactPayload('c-10'))),
+            new Response(200, [], json_encode($this->contactPayload('c-11'))),
+            new Response(200, [], json_encode($this->contactPayload('c-12'))),
+        ]);
+
+        $contacts = $client->contacts()->loadFromStubs([
+            ['id' => 'c-10'],
+            ['id' => 'c-11'],
+            ['id' => 'c-12'],
+        ]);
+
+        self::assertCount(3, $contacts);
+    }
+
+    // -------------------------------------------------------------------------
     // findByParentPartyId
     // -------------------------------------------------------------------------
 
