@@ -306,18 +306,23 @@ foreach ($customer->bankAccounts as $bank) {       // list<BankAccountDTO>
 ```php
 $contacts = $client->contacts();
 
-// Find all contacts belonging to a customer (API key: parentPartyId)
-$contacts = $contacts->findByCustomer($customerId);
+// Find all contacts belonging to a parent organisation (customer or supplier).
+// Pass the party UUID (CustomerDTO::$id / SupplierDTO::$id), not the number.
+$contacts = $contacts->findByParentPartyId($customer->id);
 
 // Find by email
 $contacts = $contacts->findByEmail('max@acme.de');
 
 echo $contact->getFullName();      // "Max Mustermann"
 echo $contact->mobilePhone1;       // mobile (API key: mobilePhone1)
-echo $contact->parentPartyId;      // parent company ID (was: customerId)
+echo $contact->parentPartyId;      // parent company party UUID
 echo $contact->personRoleId;       // job role ID (was: position)
 echo $contact->personDepartmentId; // department ID (was: department)
 ```
+
+> **Migration note:** `findByCustomer()` is deprecated — it filters on the wrong field
+> (`customerId` ≠ party UUID) and returns an empty list for most callers.
+> Use `findByParentPartyId($customer->id)` instead.
 
 ### Articles
 

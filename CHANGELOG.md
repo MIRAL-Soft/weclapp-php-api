@@ -7,6 +7,49 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased] — Branch `WeclappAPIv2`
 
+### Added — ContactResource::findByParentPartyId()
+
+- **`ContactResource::findByParentPartyId(string $parentPartyId): list<ContactDTO>`** —
+  load all contact persons of a parent organisation in one call.
+  Uses `listAll()` internally, so pagination is handled automatically regardless of the
+  contact count. Pass the weclapp party UUID (`CustomerDTO::$id` / `SupplierDTO::$id`),
+  **not** the customer or supplier number.
+
+  ```php
+  $contacts = $client->contacts()->findByParentPartyId($customer->id);
+  ```
+
+### Deprecated — ContactResource::findByCustomer()
+
+- **`ContactResource::findByCustomer(string $customerId)`** — marked `@deprecated`.
+  The method filters on the party field `customerId`, which is **not** the party UUID
+  of the parent organisation. Callers who pass `CustomerDTO::$id` (the party UUID)
+  silently receive an empty list in most tenants.
+
+  **Migration** (no behavioural change for the correct use-case):
+  ```php
+  // Before — broken when $customer->id is the party UUID:
+  $contacts = $client->contacts()->findByCustomer($customer->id);
+
+  // After — correct:
+  $contacts = $client->contacts()->findByParentPartyId($customer->id);
+  ```
+
+  The method is retained for backward compatibility and will be removed in a future
+  major release.
+
+### Fixed — Enum gaps discovered by live integration tests
+
+- **`SalesOrderStatus`** — added `CLOSED` case. Some weclapp tenants put fulfilled orders
+  into a `CLOSED` state that was not previously covered by the enum. The status-enum test
+  in `SalesOrderResourceIntegrationTest` now passes for those tenants.
+
+- **`QuotationStatus`** — added short-form aliases for the five standard states:
+  `ACCEPTED`, `REJECTED`, `IN_PROCESS`, `SENT`, `EXPIRED`.
+  Some weclapp tenants return these values without the `QUOTATION_` prefix. The live test
+  caught `ACCEPTED` and `REJECTED` in this tenant; the remaining aliases were added
+  pre-emptively to prevent future failures.
+
 ### Added — Integration test suite (live API tests)
 
 - **`tests/Integration/IntegrationTestCase`** — base class for all live API tests.
