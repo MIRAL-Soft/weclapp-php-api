@@ -498,10 +498,25 @@ final class ContactDTO extends AbstractDTO
     }
 
     /**
-     * Returns the full display name of the contact.
+     * Returns the full name of the contact as "firstName lastName".
+     * Returns an empty string when both fields are absent.
      */
     public function getFullName(): string
     {
-        return trim(($this->firstName ?? '') . ' ' . ($this->lastName ?? ''));
+        return trim(implode(' ', array_filter([
+            $this->firstName,
+            $this->lastName,
+        ])));
+    }
+
+    /**
+     * Alias for {@see getFullName()} — provided for API consistency with
+     * CustomerDTO, PartyDTO and SupplierDTO which all expose getDisplayName().
+     *
+     * Contacts are always PERSON type, so the result is always "firstName lastName".
+     */
+    public function getDisplayName(): string
+    {
+        return $this->getFullName();
     }
 }

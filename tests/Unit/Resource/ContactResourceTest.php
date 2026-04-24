@@ -181,6 +181,37 @@ class ContactResourceTest extends TestCase
     }
 
     // -------------------------------------------------------------------------
+    // ContactDTO::getDisplayName() / getFullName()
+    // -------------------------------------------------------------------------
+
+    public function test_contact_get_display_name_returns_full_name(): void
+    {
+        $client = $this->makeClient([
+            new Response(200, [], json_encode($this->contactPayload('c-1'))),
+        ]);
+
+        $contact = $client->contacts()->find('c-1');
+
+        // getDisplayName() is an alias for getFullName() on contacts (always PERSON)
+        self::assertSame('Max Mustermann', $contact->getDisplayName());
+        self::assertSame($contact->getFullName(), $contact->getDisplayName());
+    }
+
+    public function test_contact_get_display_name_returns_empty_string_when_no_name(): void
+    {
+        $payload              = $this->contactPayload('c-anon');
+        $payload['firstName'] = null;
+        $payload['lastName']  = null;
+
+        $client   = $this->makeClient([
+            new Response(200, [], json_encode($payload)),
+        ]);
+        $contact  = $client->contacts()->find('c-anon');
+
+        self::assertSame('', $contact->getDisplayName());
+    }
+
+    // -------------------------------------------------------------------------
     // findByEmail
     // -------------------------------------------------------------------------
 

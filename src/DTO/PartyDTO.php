@@ -516,16 +516,29 @@ final class PartyDTO extends AbstractDTO
     /**
      * Returns the display name of the party.
      *
-     * For ORGANIZATION type returns the company name.
-     * For PERSON type returns "firstName lastName".
+     * - ORGANIZATION → company name, falling back to customerNumber, supplierNumber,
+     *                  then empty string.
+     * - PERSON       → "firstName lastName", falling back to company (employer name),
+     *                  then customerNumber or supplierNumber, then empty string.
+     *
+     * Uses partyType (not the presence of the company field) to distinguish the two
+     * cases, because a PERSON party may have a non-null company field representing
+     * their employer — returning that as the display name would be semantically wrong.
      */
     public function getDisplayName(): string
     {
-        if ($this->company !== null && $this->company !== '') {
-            return $this->company;
+        $numberFallback = $this->customerNumber ?? $this->supplierNumber ?? '';
+
+        if ($this->partyType === 'ORGANIZATION') {
+            return $this->company ?? $numberFallback;
         }
 
-        return trim(($this->firstName ?? '') . ' ' . ($this->lastName ?? ''));
+        $name = trim(implode(' ', array_filter([
+            $this->firstName,
+            $this->lastName,
+        ])));
+
+        return $name !== '' ? $name : ($this->company ?? $numberFallback);
     }
 
     /**

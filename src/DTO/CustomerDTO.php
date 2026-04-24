@@ -515,16 +515,26 @@ final class CustomerDTO extends AbstractDTO
     /**
      * Returns the display name of the customer.
      *
-     * For ORGANIZATION type returns the company name.
-     * For PERSON type returns "firstName lastName".
+     * - ORGANIZATION → company name, falling back to customerNumber, then empty string.
+     * - PERSON       → "firstName lastName", falling back to company (employer name),
+     *                  then customerNumber, then empty string.
+     *
+     * Uses partyType (not the presence of the company field) to distinguish the two
+     * cases, because a PERSON customer may have a non-null company field representing
+     * their employer — returning that as the display name would be semantically wrong.
      */
     public function getDisplayName(): string
     {
-        if ($this->company !== null && $this->company !== '') {
-            return $this->company;
+        if ($this->partyType === 'ORGANIZATION') {
+            return $this->company ?? $this->customerNumber ?? '';
         }
 
-        return trim(($this->firstName ?? '') . ' ' . ($this->lastName ?? ''));
+        $name = trim(implode(' ', array_filter([
+            $this->firstName,
+            $this->lastName,
+        ])));
+
+        return $name !== '' ? $name : ($this->company ?? $this->customerNumber ?? '');
     }
 
     /**

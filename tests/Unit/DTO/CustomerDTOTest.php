@@ -97,6 +97,44 @@ class CustomerDTOTest extends TestCase
         self::assertSame('Max Mustermann', $dto->getDisplayName());
     }
 
+    public function test_get_display_name_ignores_company_field_for_person(): void
+    {
+        // A PERSON customer with a non-null company field (their employer).
+        // The old implementation returned the company name here — semantically wrong.
+        $data              = $this->sampleData();
+        $data['partyType'] = 'PERSON';
+        $data['company']   = 'Employer GmbH'; // employer, not the person's display name
+        $data['firstName'] = 'Anna';
+        $data['lastName']  = 'Schmidt';
+
+        $dto = CustomerDTO::fromArray($data);
+
+        self::assertSame('Anna Schmidt', $dto->getDisplayName());
+    }
+
+    public function test_get_display_name_falls_back_to_customer_number_for_organization_without_company(): void
+    {
+        $data            = $this->sampleData();
+        $data['company'] = null;
+
+        $dto = CustomerDTO::fromArray($data);
+
+        self::assertSame('K-10042', $dto->getDisplayName());
+    }
+
+    public function test_get_display_name_falls_back_to_customer_number_for_person_without_name(): void
+    {
+        $data               = $this->sampleData();
+        $data['partyType']  = 'PERSON';
+        $data['company']    = null;
+        $data['firstName']  = null;
+        $data['lastName']   = null;
+
+        $dto = CustomerDTO::fromArray($data);
+
+        self::assertSame('K-10042', $dto->getDisplayName());
+    }
+
     public function test_get_created_at_returns_datetime(): void
     {
         $dto = CustomerDTO::fromArray($this->sampleData());
