@@ -75,7 +75,25 @@ class ContactResource extends AbstractResource
     /**
      * Find all contacts that belong to a specific customer.
      *
-     * @param string $customerId The weclapp UUID of the customer.
+     * @deprecated This method is misleading and will be removed in a future release.
+     *
+     *   The filter field `customerId` on the weclapp `/api/v2/party` endpoint is
+     *   **not** the party UUID of the customer — it is an internal customer-assignment
+     *   field that is rarely populated on contact records. Passing `CustomerDTO::$id`
+     *   (the party UUID) here will silently return an empty list in most tenants.
+     *
+     *   **Use {@see findByParentPartyId()} instead:**
+     *   ```php
+     *   // Before (broken for most callers):
+     *   $contacts = $client->contacts()->findByCustomer($customer->id);
+     *
+     *   // After (correct):
+     *   $contacts = $client->contacts()->findByParentPartyId($customer->id);
+     *   ```
+     *   `parentPartyId` is the field weclapp uses to link a contact person to its
+     *   parent organisation party, and `CustomerDTO::$id` is exactly that party UUID.
+     *
+     * @param string $customerId Internal customer-assignment ID (NOT the party UUID).
      * @return list<ContactDTO>
      *
      * @throws WeclappApiException
