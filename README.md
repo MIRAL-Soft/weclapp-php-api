@@ -281,7 +281,8 @@ $results  = $customers->findByEmail('info@acme.de');
 $results  = $customers->findByName('Smith');
 // → matches "Smith Ltd." (company) and "John Smith" (person)
 
-// Display name (company name for ORGANIZATION, "First Last" for PERSON)
+// Display name — uses partyType, not the company field, to distinguish cases:
+// ORGANIZATION → company ?? customerNumber; PERSON → "firstName lastName" ?? customerNumber
 echo $customer->getDisplayName();
 
 // Correct API field names (party schema, 137 fields total)
@@ -314,7 +315,8 @@ $customer = $client->customers()->find($customerId);
 $contacts = $client->contacts()->loadFromStubs($customer->contacts);
 
 foreach ($contacts as $contact) {
-    echo $contact->getFullName();       // "Max Mustermann"
+    echo $contact->getDisplayName();    // "Max Mustermann" — consistent with other party DTOs
+    echo $contact->getFullName();       // identical — alias kept for backward compatibility
     echo $contact->email;
     echo $contact->mobilePhone1;        // mobile (API key: mobilePhone1)
     echo $contact->personRoleId;        // job role ID

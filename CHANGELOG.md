@@ -7,6 +7,33 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased] — Branch `WeclappAPIv2`
 
+### Fixed — getDisplayName() uses partyType instead of company presence
+
+All three party-based DTOs (`CustomerDTO`, `PartyDTO`, `SupplierDTO`) checked
+`company !== null` to decide between ORGANIZATION and PERSON rendering. A PERSON
+customer/supplier who has a non-null `company` field (their employer) would have had
+the company name returned instead of "First Last" — semantically wrong and a silent
+data error in any downstream system.
+
+**Changes:**
+
+- **`CustomerDTO::getDisplayName()`** — condition changed from `company !== null` to
+  `partyType === 'ORGANIZATION'`; fallback chain extended:
+  - ORGANIZATION: `company ?? customerNumber ?? ''`
+  - PERSON: `"firstName lastName"` → `company` (employer) → `customerNumber` → `''`
+
+- **`PartyDTO::getDisplayName()`** — same fix; number fallback:
+  `customerNumber ?? supplierNumber ?? ''` (PartyDTO covers both party roles)
+
+- **`SupplierDTO::getDisplayName()`** — same fix; fallback chain:
+  - ORGANIZATION: `company ?? supplierNumber ?? ''`
+  - PERSON: `"firstName lastName"` → `company` → `supplierNumber` → `''`
+
+- **`ContactDTO::getDisplayName()`** — added as a thin alias for `getFullName()`.
+  Contacts are always `PERSON` type, so the result is always `"firstName lastName"`.
+  Provides a consistent `getDisplayName()` surface across all four party DTOs.
+  `getFullName()` is retained for backward compatibility.
+
 ### Added — ContactResource::loadFromStubs()
 
 - **`ContactResource::loadFromStubs(list<array> $stubs): list<ContactDTO>`** —
