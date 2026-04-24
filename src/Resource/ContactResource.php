@@ -51,6 +51,28 @@ class ContactResource extends AbstractResource
     }
 
     /**
+     * Find all contacts linked to a given parent organisation party.
+     *
+     * weclapp stores the link via the `parentPartyId` field on the contact party.
+     * The parent is typically a customer or supplier organisation party.
+     *
+     * Use this to load all contacts of a customer by passing the customer's
+     * weclapp UUID (`CustomerDTO::$id`), not the customer number.
+     *
+     * @param string $parentPartyId The weclapp UUID of the parent organisation.
+     * @return list<ContactDTO>
+     *
+     * @throws WeclappApiException
+     */
+    public function findByParentPartyId(string $parentPartyId): array
+    {
+        /** @var list<ContactDTO> */
+        return $this->listAll(
+            QueryBuilder::new()->filterEq('parentPartyId', $parentPartyId)
+        );
+    }
+
+    /**
      * Find all contacts that belong to a specific customer.
      *
      * @param string $customerId The weclapp UUID of the customer.
