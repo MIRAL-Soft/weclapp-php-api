@@ -835,6 +835,63 @@ $config = new WeclappConfig(tenant: 'miralsoft', token: 'token', maxRetries: 5);
 
 ---
 
+## Dry-Run Mode
+
+Every resource supports weclapp's built-in dry-run mechanism: append `?dryRun=true`
+to a write request and weclapp validates the payload and runs business logic —
+but **does not save anything**. Ideal for pre-flight validation before actually
+committing data.
+
+```php
+// Validate a new order without creating it
+$order = $client->salesOrders()->withDryRun()->create([
+    'customerId' => 'cust-123',
+    'orderItems' => [
+        ['articleId' => 'art-1', 'quantity' => '2.00'],
+    ],
+]);
+// $order is a fully populated SalesOrderDTO, but $order->id === '' (not saved)
+
+// Test whether an update would pass validation
+try {
+    $client->customers()->withDryRun()->update($customerId, ['vatId' => 'INVALID']);
+    echo 'Update would succeed.';
+} catch (\miralsoft\weclapp\api\Exception\ValidationException $e) {
+    echo 'Would fail: ' . implode(', ', $e->getErrors());
+}
+
+// Check whether a delete would be blocked by weclapp business rules
+try {
+    $client->articles()->withDryRun()->delete($articleId);
+    echo 'Safe to delete.';
+} catch (\miralsoft\weclapp\api\Exception\WeclappApiException $e) {
+    echo 'Cannot delete: ' . $e->getMessage();
+}
+```
+
+**Key points:**
+
+| Aspect | Detail |
+|---|---|
+| **Trigger** | `->withDryRun()` on any resource — returns a clone, never mutates the original |
+| **Affected methods** | `create()`, `update()`, `delete()` |
+| **Unaffected methods** | All read operations (`find`, `list`, `listAll`, `cursor`, …) |
+| **create / update** | HTTP 200 returned; DTO populated minus `id` / `version` / dates |
+| **delete** | HTTP 200 returned; void returned as usual |
+| **Errors** | Identical exceptions to real calls (`ValidationException`, `NotFoundException`, etc.) |
+| **Scope** | `withDryRun()` clones the resource; original stays in normal mode |
+
+```php
+$res = $client->salesOrders()->withDryRun();
+$res->isDryRun(); // true
+
+// Re-disable on a clone:
+$realRes = $res->withDryRun(false);
+$realRes->isDryRun(); // false
+```
+
+---
+
 ## Caching
 
 Inject a PSR-16 cache to avoid redundant `listAll()` calls.

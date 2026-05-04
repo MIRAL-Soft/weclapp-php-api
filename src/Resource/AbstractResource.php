@@ -45,6 +45,13 @@ abstract class AbstractResource
     protected string $dtoClass;
 
     /**
+     * Whether write operations (create / update / delete) are sent with ?dryRun=true.
+     *
+     * Never mutate this directly — use withDryRun() which returns a clone.
+     */
+    private bool $dryRun = false;
+
+    /**
      * @param HttpClient        $http        HTTP client for making requests.
      * @param RateLimiter       $rateLimiter Handles HTTP 429 retry logic.
      * @param CacheInterface|null $cache     Optional PSR-16 cache for listAll() results.
@@ -54,6 +61,78 @@ abstract class AbstractResource
         protected readonly RateLimiter   $rateLimiter,
         protected readonly ?CacheInterface $cache = null,
     ) {}
+
+    // -------------------------------------------------------------------------
+    // Dry-run mode
+    // -------------------------------------------------------------------------
+
+    /**
+     * Return a copy of this resource with dry-run mode enabled (or disabled).
+     *
+     * In dry-run mode every write operation (create, update, delete) appends
+     * `?dryRun=true` to the request URL. weclapp then validates the payload and
+     * executes business logic — but **does not persist any data**.
+     *
+     * Response behaviour in dry-run mode:
+     * - **create / update**: HTTP 200 with the entity body minus the four meta
+     *   fields (`id`, `version`, `createdDate`, `lastModifiedDate`). Those fields
+     *   will therefore be `null` in the returned DTO — all other fields are
+     *   populated as they would be after a real write.
+     * - **delete**: HTTP 200 (instead of 204); the body is silently ignored and
+     *   `void` is returned, as with a regular delete.
+     * - **errors**: identical to a real call — `ValidationException` on 400,
+     *   `NotFoundException` on 404, `OptimisticLockException` on 409, etc.
+     *
+     * The original resource instance is never mutated; a lightweight clone is
+     * returned. Call `withDryRun(false)` to get a non-dry-run clone.
+     *
+     * **Supported endpoints:** generic `POST`, `PUT`, `DELETE`. Read operations
+     * (`find`, `list`, `listAll`, etc.) are unaffected and always hit the real API.
+     *
+     * @example Validate a new order without persisting it
+     * ```php
+     * $order = $client->salesOrders()->withDryRun()->create([
+     *     'customerId' => 'cust-123',
+     *     'orderItems' => [['articleId' => 'art-1', 'quantity' => '2.00']],
+     * ]);
+     * // $order->id === null (not saved), $order->status is populated
+     * ```
+     *
+     * @example Test whether an update would pass validation
+     * ```php
+     * try {
+     *     $client->customers()->withDryRun()->update($id, ['vatId' => 'INVALID']);
+     *     echo 'Update would succeed.';
+     * } catch (ValidationException $e) {
+     *     echo 'Would fail: ' . implode(', ', $e->getErrors());
+     * }
+     * ```
+     *
+     * @example Verify a delete would not be rejected (e.g. referenced record)
+     * ```php
+     * try {
+     *     $client->articles()->withDryRun()->delete($articleId);
+     *     echo 'Safe to delete.';
+     * } catch (WeclappApiException $e) {
+     *     echo 'Cannot delete: ' . $e->getMessage();
+     * }
+     * ```
+     */
+    public function withDryRun(bool $enable = true): static
+    {
+        $clone          = clone $this;
+        $clone->dryRun  = $enable;
+
+        return $clone;
+    }
+
+    /**
+     * Returns true if this resource instance is operating in dry-run mode.
+     */
+    public function isDryRun(): bool
+    {
+        return $this->dryRun;
+    }
 
     /**
      * Returns the total number of records matching the optional filter query.
@@ -182,7 +261,7 @@ abstract class AbstractResource
     public function create(array $data): AbstractDTO
     {
         $response = $this->rateLimiter->execute(
-            fn () => $this->http->post($this->endpoint, $data)
+            fn () => $this->http->post($this->endpoint, $data, $this->dryRun)
         );
 
         return ($this->dtoClass)::fromArray($response);
@@ -205,7 +284,7 @@ abstract class AbstractResource
     public function update(string $id, array $data): AbstractDTO
     {
         $response = $this->rateLimiter->execute(
-            fn () => $this->http->put($this->endpoint . '/id/' . $id, $data)
+            fn () => $this->http->put($this->endpoint . '/id/' . $id, $data, $this->dryRun)
         );
 
         return ($this->dtoClass)::fromArray($response);
@@ -222,7 +301,7 @@ abstract class AbstractResource
     public function delete(string $id): void
     {
         $this->rateLimiter->execute(
-            fn () => $this->http->delete($this->endpoint . '/id/' . $id)
+            fn () => $this->http->delete($this->endpoint . '/id/' . $id, $this->dryRun)
         );
     }
 

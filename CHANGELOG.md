@@ -7,6 +7,74 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased] — Branch `WeclappAPIv2`
 
+### Added — Dry-run mode (`AbstractResource::withDryRun()`)
+
+All resource classes now support weclapp's built-in dry-run mechanism
+(`?dryRun=true` query parameter) for validating write operations without
+persisting data.
+
+**API:**
+
+```php
+$resource = $client->salesOrders()->withDryRun(); // returns a clone, original unchanged
+```
+
+`withDryRun()` returns a lightweight clone of the resource with dry-run mode
+enabled. The original instance is **never mutated** — successive calls to the
+same `$client->salesOrders()` always return a fresh, non-dry-run resource.
+Use `withDryRun(false)` to get a non-dry-run clone of an already-dry-run resource.
+
+**Affected methods:** `create()`, `update()`, `delete()`.
+Read operations (`find`, `list`, `listAll`, `cursor`, etc.) are unaffected.
+
+**Response behaviour:**
+- `create()` / `update()`: weclapp returns `HTTP 200` (instead of 201) with the
+  full entity body minus `id`, `version`, `createdDate`, `lastModifiedDate`.
+  Those four fields will be `''` / `0` in the returned DTO (the DTO default for
+  absent string/int fields). All business-computed fields are populated.
+- `delete()`: weclapp returns `HTTP 200` (instead of 204); the response body is
+  silently ignored and `void` is returned, consistent with a normal delete.
+- Errors (`400`, `404`, `409`, …) are thrown as the same typed exceptions as in
+  a real call — `ValidationException`, `NotFoundException`,
+  `OptimisticLockException`, etc.
+
+**Examples:**
+
+```php
+// Validate a new sales order without saving it
+$order = $client->salesOrders()->withDryRun()->create([
+    'customerId' => 'cust-123',
+    'orderItems' => [['articleId' => 'art-1', 'quantity' => '2.00']],
+]);
+// $order->id === '' (not persisted), $order->status and other fields populated
+
+// Test whether an update would pass validation
+try {
+    $client->customers()->withDryRun()->update($id, ['vatId' => 'INVALID']);
+    echo 'Update would succeed.';
+} catch (ValidationException $e) {
+    echo 'Would fail: ' . implode(', ', $e->getErrors());
+}
+
+// Verify a delete would not be rejected by business rules
+try {
+    $client->articles()->withDryRun()->delete($articleId);
+    echo 'Safe to delete.';
+} catch (WeclappApiException $e) {
+    echo 'Cannot delete: ' . $e->getMessage();
+}
+
+// isDryRun() helper for conditional logic
+$res = $client->salesOrders()->withDryRun();
+if ($res->isDryRun()) { /* ... */ }
+```
+
+**Implementation:** `withDryRun()` is defined on `AbstractResource` and is
+therefore available on every resource class (`customers()`, `salesOrders()`,
+`articles()`, etc.) with no per-resource changes required. The `bool $dryRun`
+flag is propagated to `HttpClient::post()`, `HttpClient::put()`, and
+`HttpClient::delete()`, each of which appends `?dryRun=true` to the URL.
+
 ### Added — WebhookResource idempotent setup helpers + full entityName enum
 
 **`WebhookEntityName` enum — expanded from 10 to 121 cases**

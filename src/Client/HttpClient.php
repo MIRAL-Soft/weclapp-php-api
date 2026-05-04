@@ -113,31 +113,37 @@ final class HttpClient
     /**
      * Perform a POST request and return the decoded JSON response.
      *
-     * @param string               $path API endpoint path.
-     * @param array<string, mixed> $data Request body payload.
+     * @param string               $path    API endpoint path.
+     * @param array<string, mixed> $data    Request body payload.
+     * @param bool                 $dryRun  When true, appends ?dryRun=true — weclapp validates
+     *                                      the request and runs business logic but does not persist.
+     *                                      Returns HTTP 200 instead of 201 on success.
      *
      * @return array<string, mixed>
      *
      * @throws WeclappApiException On any API or network error.
      */
-    public function post(string $path, array $data): array
+    public function post(string $path, array $data, bool $dryRun = false): array
     {
-        return $this->request('POST', $path, '', $data);
+        return $this->request('POST', $path, $dryRun ? '?dryRun=true' : '', $data);
     }
 
     /**
      * Perform a PUT request and return the decoded JSON response.
      *
-     * @param string               $path API endpoint path.
-     * @param array<string, mixed> $data Request body payload.
+     * @param string               $path    API endpoint path.
+     * @param array<string, mixed> $data    Request body payload.
+     * @param bool                 $dryRun  When true, appends ?dryRun=true — weclapp validates
+     *                                      the request and runs business logic but does not persist.
+     *                                      Returns HTTP 200 instead of the usual 200 on success.
      *
      * @return array<string, mixed>
      *
      * @throws WeclappApiException On any API or network error.
      */
-    public function put(string $path, array $data): array
+    public function put(string $path, array $data, bool $dryRun = false): array
     {
-        return $this->request('PUT', $path, '', $data);
+        return $this->request('PUT', $path, $dryRun ? '?dryRun=true' : '', $data);
     }
 
     /**
@@ -201,13 +207,16 @@ final class HttpClient
     /**
      * Perform a DELETE request.
      *
-     * @param string $path API endpoint path including the resource ID, e.g. "customer/123".
+     * @param string $path    API endpoint path including the resource ID, e.g. "customer/123".
+     * @param bool   $dryRun  When true, appends ?dryRun=true — weclapp validates the delete
+     *                        without actually removing the record. Returns HTTP 200 on success
+     *                        (instead of 204); the response body is silently ignored.
      *
      * @throws WeclappApiException On any API or network error.
      */
-    public function delete(string $path): void
+    public function delete(string $path, bool $dryRun = false): void
     {
-        $url   = $this->buildUrl($path);
+        $url   = $this->buildUrl($path, $dryRun ? '?dryRun=true' : '');
         $start = hrtime(true);
 
         $this->logger->debug('[weclapp] DELETE {path}', ['path' => $path]);
