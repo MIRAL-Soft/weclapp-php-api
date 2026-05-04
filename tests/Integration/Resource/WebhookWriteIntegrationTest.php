@@ -38,16 +38,7 @@ class WebhookWriteIntegrationTest extends IntegrationTestCase
     protected function setUp(): void
     {
         parent::setUp();
-
-        $allowed = getenv('WECLAPP_ALLOW_WRITES') ?: ($_ENV['WECLAPP_ALLOW_WRITES'] ?? '');
-
-        if (!in_array(strtolower((string) $allowed), ['true', '1', 'yes'], true)) {
-            $this->markTestSkipped(
-                'Write tests are disabled by default. ' .
-                'Set WECLAPP_ALLOW_WRITES=true to enable them. ' .
-                'They will create and immediately delete real webhook records.'
-            );
-        }
+        $this->requireWrites(); // loads .env.test and checks WECLAPP_ALLOW_WRITES
     }
 
     /**
@@ -76,7 +67,9 @@ class WebhookWriteIntegrationTest extends IntegrationTestCase
 
             self::assertInstanceOf(WebhookDTO::class, $webhook);
             self::assertNotEmpty($webhook->id, 'Created webhook must have an id.');
-            self::assertNotEmpty($webhook->version);
+            // Use assertNotSame instead of assertNotEmpty: weclapp returns version="0" for
+            // new records, and empty("0") is true in PHP (would cause a false failure).
+            self::assertNotSame('', $webhook->version);
             self::assertSame('salesOrder', $webhook->entityName);
             self::assertSame($url, $webhook->url);
             self::assertTrue($webhook->atCreate);
@@ -135,10 +128,20 @@ class WebhookWriteIntegrationTest extends IntegrationTestCase
 
             self::assertFalse($webhook->atUpdate, 'atUpdate must be false after creation.');
 
+            // weclapp webhook PUT requires the full record back (including read-only identity
+            // fields id, createdDate, lastModifiedDate). Partial payloads cause 400.
             $updated = $this->client()->webhooks()->update($webhook->id, [
-                'version'  => $webhook->version,
-                'atCreate' => true,
-                'atUpdate' => true,  // add atUpdate
+                'id'               => $webhook->id,
+                'version'          => $webhook->version,
+                'createdDate'      => $webhook->createdDate,
+                'lastModifiedDate' => $webhook->lastModifiedDate,
+                'entityName'       => $webhook->entityName,
+                'url'              => $webhook->url,
+                'atCreate'         => true,
+                'atUpdate'         => true,  // add atUpdate
+                'atDelete'         => $webhook->atDelete,
+                'requestMethod'    => $webhook->requestMethod,
+                'deactivatedDate'  => $webhook->deactivatedDate,
             ]);
 
             self::assertTrue($updated->atUpdate, 'atUpdate must be true after update.');

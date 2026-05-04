@@ -72,6 +72,52 @@ abstract class IntegrationTestCase extends TestCase
     }
 
     /**
+     * Returns the weclapp internal ID of the dedicated test customer, or null
+     * when WECLAPP_TEST_CUSTOMER_ID is not configured.
+     *
+     * Tests that need a real customer should prefer this over fetching the first
+     * customer from a list — it makes tests deterministic and avoids operating on
+     * random production data.
+     */
+    final protected function testCustomerId(): ?string
+    {
+        $this->loadEnvFile();
+
+        $id = (string) (getenv('WECLAPP_TEST_CUSTOMER_ID') ?: ($_ENV['WECLAPP_TEST_CUSTOMER_ID'] ?? ''));
+
+        return $id !== '' ? $id : null;
+    }
+
+    /**
+     * Guard for write-enabled tests.
+     *
+     * Loads tests/.env.test and checks WECLAPP_ALLOW_WRITES. Marks the test
+     * as skipped (not failed) when the variable is absent or false.
+     *
+     * Call this at the top of setUp() in any test class that writes real data:
+     *
+     *   protected function setUp(): void
+     *   {
+     *       parent::setUp();
+     *       $this->requireWrites();
+     *   }
+     */
+    final protected function requireWrites(): void
+    {
+        $this->loadEnvFile();
+
+        $allowed = (string) (getenv('WECLAPP_ALLOW_WRITES') ?: ($_ENV['WECLAPP_ALLOW_WRITES'] ?? ''));
+
+        if (!in_array(strtolower($allowed), ['true', '1', 'yes'], true)) {
+            $this->markTestSkipped(
+                'Write tests are disabled by default. ' .
+                'Set WECLAPP_ALLOW_WRITES=true in tests/.env.test to enable them. ' .
+                'Run: php vendor/bin/phpunit --testsuite Write',
+            );
+        }
+    }
+
+    /**
      * Load tests/.env.test once per process if the file exists.
      *
      * Lines starting with # and lines without = are ignored.

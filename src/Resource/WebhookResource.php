@@ -46,6 +46,14 @@ use miralsoft\weclapp\api\Exception\WeclappApiException;
  *   requestMethod                             — enum: "GET" | "POST" (writable)
  *   url                                       — string, max 1000 (writable)
  *
+ * ⚠️  PUT full-payload requirement (verified 2026-05-04):
+ *   The webhook PUT endpoint requires ALL fields including the normally read-only
+ *   identity fields (id, createdDate, lastModifiedDate). Sending a partial payload
+ *   triggers a 400 validation error: "property createdDate is read-only". The fields
+ *   must be passed with their CURRENT values from the GET response. Only the fields
+ *   you actually want to change should differ. This is unusual for REST APIs and was
+ *   confirmed by live testing against the miralsoft tenant.
+ *
  * entityName values:
  *   117 values confirmed from the weclapp admin UI on 2026-05-04.
  *   See WebhookEntityName enum for the complete list with categories and @beta tags.
@@ -250,13 +258,22 @@ class WebhookResource extends AbstractResource
         }
 
         // Merge flags additively: existing true flags stay true, new ones are added.
+        // weclapp's webhook PUT endpoint requires the full record to be sent back
+        // (including the read-only identity fields id, createdDate, lastModifiedDate).
+        // Sending a partial payload triggers "property X is read-only" validation errors.
         /** @var WebhookDTO */
         return $this->update($match->id, [
-            'version'       => $match->version,
-            'atCreate'      => $match->atCreate || $atCreate,
-            'atUpdate'      => $match->atUpdate || $atUpdate,
-            'atDelete'      => $match->atDelete || $atDelete,
-            'requestMethod' => $requestMethod,
+            'id'              => $match->id,
+            'version'         => $match->version,
+            'createdDate'     => $match->createdDate,
+            'lastModifiedDate' => $match->lastModifiedDate,
+            'entityName'      => $match->entityName,
+            'url'             => $match->url,
+            'atCreate'        => $match->atCreate || $atCreate,
+            'atUpdate'        => $match->atUpdate || $atUpdate,
+            'atDelete'        => $match->atDelete || $atDelete,
+            'requestMethod'   => $requestMethod,
+            'deactivatedDate' => $match->deactivatedDate,
         ]);
     }
 
@@ -328,10 +345,22 @@ class WebhookResource extends AbstractResource
             return $webhook; // already deactivated — no write needed
         }
 
+        // weclapp's webhook PUT requires the full record back, including the read-only
+        // identity fields (id, createdDate, lastModifiedDate). Partial payloads trigger
+        // "property X is read-only" validation errors.
         /** @var WebhookDTO */
         return $this->update($id, [
-            'version'         => $webhook->version,
-            'deactivatedDate' => (int) (microtime(true) * 1000),
+            'id'               => $webhook->id,
+            'version'          => $webhook->version,
+            'createdDate'      => $webhook->createdDate,
+            'lastModifiedDate' => $webhook->lastModifiedDate,
+            'entityName'       => $webhook->entityName,
+            'url'              => $webhook->url,
+            'atCreate'         => $webhook->atCreate,
+            'atUpdate'         => $webhook->atUpdate,
+            'atDelete'         => $webhook->atDelete,
+            'requestMethod'    => $webhook->requestMethod,
+            'deactivatedDate'  => (int) (microtime(true) * 1000),
         ]);
     }
 
@@ -362,10 +391,22 @@ class WebhookResource extends AbstractResource
             return $webhook; // already active — no write needed
         }
 
+        // weclapp's webhook PUT requires the full record back, including the read-only
+        // identity fields (id, createdDate, lastModifiedDate). Partial payloads trigger
+        // "property X is read-only" validation errors.
         /** @var WebhookDTO */
         return $this->update($id, [
-            'version'         => $webhook->version,
-            'deactivatedDate' => null,
+            'id'               => $webhook->id,
+            'version'          => $webhook->version,
+            'createdDate'      => $webhook->createdDate,
+            'lastModifiedDate' => $webhook->lastModifiedDate,
+            'entityName'       => $webhook->entityName,
+            'url'              => $webhook->url,
+            'atCreate'         => $webhook->atCreate,
+            'atUpdate'         => $webhook->atUpdate,
+            'atDelete'         => $webhook->atDelete,
+            'requestMethod'    => $webhook->requestMethod,
+            'deactivatedDate'  => null,
         ]);
     }
 

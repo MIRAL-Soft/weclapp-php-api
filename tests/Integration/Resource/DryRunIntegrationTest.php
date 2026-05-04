@@ -76,14 +76,16 @@ class DryRunIntegrationTest extends IntegrationTestCase
 
     public function test_dry_run_sales_order_create_with_real_customer_id(): void
     {
-        // Fetch a real customerId from the tenant so the dry-run passes business validation
-        $customers = $this->client()->customers()->list(QueryBuilder::new()->pageSize(1));
+        // Prefer WECLAPP_TEST_CUSTOMER_ID for deterministic results; fall back to list()
+        $customerId = $this->testCustomerId();
 
-        if (empty($customers->items)) {
-            $this->markTestSkipped('No customers in this tenant.');
+        if ($customerId === null) {
+            $customers = $this->client()->customers()->list(QueryBuilder::new()->pageSize(1));
+            if (empty($customers->items)) {
+                $this->markTestSkipped('No customers in this tenant and WECLAPP_TEST_CUSTOMER_ID not set.');
+            }
+            $customerId = $customers->items[0]->id;
         }
-
-        $customerId = $customers->items[0]->id;
 
         $order = $this->client()->salesOrders()->withDryRun()->create([
             'customerId' => $customerId,
