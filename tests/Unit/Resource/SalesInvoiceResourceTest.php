@@ -11,6 +11,7 @@ use GuzzleHttp\Psr7\Response;
 use miralsoft\weclapp\api\Client\WeclappClient;
 use miralsoft\weclapp\api\Config\WeclappConfig;
 use miralsoft\weclapp\api\DTO\SalesInvoiceDTO;
+use miralsoft\weclapp\api\Exception\NotFoundException;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -153,5 +154,37 @@ class SalesInvoiceResourceTest extends TestCase
 
         $client->salesInvoices()->delete('inv-1');
         $this->addToAssertionCount(1);
+    }
+
+    // -------------------------------------------------------------------------
+    // findByInvoiceNumber
+    // -------------------------------------------------------------------------
+
+    public function test_find_by_invoice_number_returns_matching_invoice(): void
+    {
+        $payload        = $this->invoicePayload('inv-99');
+        $payload['invoiceNumber'] = 'RE-10042';
+
+        $client = $this->makeClient([
+            new Response(200, [], json_encode(['result' => [$payload]])),
+        ]);
+
+        $invoice = $client->salesInvoices()->findByInvoiceNumber('RE-10042');
+
+        self::assertInstanceOf(SalesInvoiceDTO::class, $invoice);
+        self::assertSame('inv-99', $invoice->id);
+        self::assertSame('RE-10042', $invoice->invoiceNumber);
+    }
+
+    public function test_find_by_invoice_number_throws_not_found_when_missing(): void
+    {
+        $this->expectException(NotFoundException::class);
+        $this->expectExceptionMessage('RE-UNKNOWN');
+
+        $client = $this->makeClient([
+            new Response(200, [], json_encode(['result' => []])),
+        ]);
+
+        $client->salesInvoices()->findByInvoiceNumber('RE-UNKNOWN');
     }
 }

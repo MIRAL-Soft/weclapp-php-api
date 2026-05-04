@@ -6,6 +6,7 @@ namespace miralsoft\weclapp\api\Resource;
 
 use miralsoft\weclapp\api\DTO\QuotationDTO;
 use miralsoft\weclapp\api\DTO\SalesOrderDTO;
+use miralsoft\weclapp\api\Exception\NotFoundException;
 use miralsoft\weclapp\api\Exception\WeclappApiException;
 use miralsoft\weclapp\api\Query\QueryBuilder;
 
@@ -58,6 +59,33 @@ class QuotationResource extends AbstractResource
         );
 
         return SalesOrderDTO::fromArray($response);
+    }
+
+    /**
+     * Find a quotation by its human-readable quotation number (e.g. "ANG-10042").
+     *
+     * @param string $quotationNumber The quotation number shown in the weclapp UI.
+     * @return QuotationDTO
+     *
+     * @throws NotFoundException   If no quotation with that number exists.
+     * @throws WeclappApiException
+     */
+    public function findByQuotationNumber(string $quotationNumber): QuotationDTO
+    {
+        $result = $this->list(
+            QueryBuilder::new()
+                ->filterEq('quotationNumber', $quotationNumber)
+                ->pageSize(1)
+        );
+
+        if (empty($result->items)) {
+            throw new NotFoundException(
+                sprintf('Quotation with number "%s" not found.', $quotationNumber)
+            );
+        }
+
+        /** @var QuotationDTO */
+        return $result->items[0];
     }
 
     /**

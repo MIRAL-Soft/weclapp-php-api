@@ -122,6 +122,36 @@ class SalesInvoiceResource extends AbstractResource
     }
 
     /**
+     * Find a sales invoice by its human-readable invoice number (e.g. "RE-10042").
+     *
+     * Works for all invoice types including credit notes (CLX-prefix) and
+     * proforma invoices (tenant-configured prefix, e.g. "PR-").
+     *
+     * @param string $invoiceNumber The invoice number shown in the weclapp UI.
+     * @return SalesInvoiceDTO
+     *
+     * @throws \miralsoft\weclapp\api\Exception\NotFoundException If no invoice with that number exists.
+     * @throws WeclappApiException
+     */
+    public function findByInvoiceNumber(string $invoiceNumber): SalesInvoiceDTO
+    {
+        $result = $this->list(
+            QueryBuilder::new()
+                ->filterEq('invoiceNumber', $invoiceNumber)
+                ->pageSize(1)
+        );
+
+        if (empty($result->items)) {
+            throw new \miralsoft\weclapp\api\Exception\NotFoundException(
+                sprintf('Sales invoice with number "%s" not found.', $invoiceNumber)
+            );
+        }
+
+        /** @var SalesInvoiceDTO */
+        return $result->items[0];
+    }
+
+    /**
      * Find all credit notes across all customers.
      *
      * Credit notes are identified by salesInvoiceType = CREDIT_NOTE and carry

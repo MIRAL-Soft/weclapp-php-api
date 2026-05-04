@@ -123,4 +123,21 @@ class QuotationResourceIntegrationTest extends IntegrationTestCase
 
         self::assertContainsOnlyInstancesOf(QuotationDTO::class, $result->items);
     }
+
+    public function test_find_by_quotation_number_returns_same_record(): void
+    {
+        $result = $this->client()->quotations()->list(
+            QueryBuilder::new()->pageSize(1),
+        );
+
+        if (empty($result->items)) {
+            $this->markTestSkipped('No quotations found in this tenant.');
+        }
+
+        $quotationNumber = $result->items[0]->quotationNumber;
+        $quotation       = $this->client()->quotations()->findByQuotationNumber($quotationNumber);
+
+        self::assertInstanceOf(QuotationDTO::class, $quotation);
+        self::assertSame($quotationNumber, $quotation->quotationNumber);
+    }
 }

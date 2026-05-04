@@ -93,4 +93,21 @@ class SalesInvoiceResourceIntegrationTest extends IntegrationTestCase
         self::assertIsInt($count);
         self::assertGreaterThan(0, $count, 'Expected at least one sales invoice in this tenant.');
     }
+
+    public function test_find_by_invoice_number_returns_same_record(): void
+    {
+        $result = $this->client()->salesInvoices()->list(
+            QueryBuilder::new()->pageSize(1),
+        );
+
+        if (empty($result->items)) {
+            $this->markTestSkipped('No sales invoices found in this tenant.');
+        }
+
+        $invoiceNumber = $result->items[0]->invoiceNumber;
+        $invoice       = $this->client()->salesInvoices()->findByInvoiceNumber($invoiceNumber);
+
+        self::assertInstanceOf(SalesInvoiceDTO::class, $invoice);
+        self::assertSame($invoiceNumber, $invoice->invoiceNumber);
+    }
 }

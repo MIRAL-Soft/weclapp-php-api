@@ -99,6 +99,37 @@ re-fetch the order and retry.
   $updated = $client->salesOrders()->removeOrderItem($orderId, $itemId);
   ```
 
+### Added — findByNumber() convenience lookups (SalesOrder, SalesInvoice, Quotation)
+
+Human-readable number lookup on the three main sales document resources.
+All three follow the same pattern: `list()` with an equality filter on the number field,
+`pageSize(1)`, and throw `NotFoundException` if the result set is empty.
+
+- **`SalesOrderResource::findByOrderNumber(string $orderNumber): SalesOrderDTO`**
+
+  Finds a sales order by its UI-visible order number (e.g. `"SO-10042"`).
+
+  ```php
+  $order = $client->salesOrders()->findByOrderNumber('SO-10042');
+  ```
+
+- **`SalesInvoiceResource::findByInvoiceNumber(string $invoiceNumber): SalesInvoiceDTO`**
+
+  Finds a sales invoice by its invoice number (e.g. `"RE-10042"`, `"CLX-1061"`, `"PR-0007"`).
+  Works for all invoice types including credit notes and proforma invoices.
+
+  ```php
+  $invoice = $client->salesInvoices()->findByInvoiceNumber('RE-10042');
+  ```
+
+- **`QuotationResource::findByQuotationNumber(string $quotationNumber): QuotationDTO`**
+
+  Finds a quotation by its quotation number (e.g. `"ANG-10042"`).
+
+  ```php
+  $quotation = $client->quotations()->findByQuotationNumber('ANG-10042');
+  ```
+
 ### Added — ArticleResource::findCategoryIdByNumber()
 
 - **`ArticleResource::findCategoryIdByNumber(string $articleNumber): ?string`**

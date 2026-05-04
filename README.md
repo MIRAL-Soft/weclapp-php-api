@@ -406,6 +406,9 @@ $orders = $orders->findByCustomer($customerId);
 // Find by status
 $open = $orders->findByStatus('ORDER_CONFIRMED');
 
+// Find by human-readable order number (throws NotFoundException if not found)
+$order = $client->salesOrders()->findByOrderNumber('SO-10042');
+
 // Download order confirmation PDF
 $pdf = $orders->getPdf($orderId);
 file_put_contents('order-confirmation.pdf', $pdf);
@@ -456,6 +459,10 @@ $invoices = $client->salesInvoices();
 
 // Find open (unpaid) invoices
 $open = $invoices->findOpen();
+
+// Find by human-readable invoice number (throws NotFoundException if not found)
+// Works for all invoice types: regular (RE-*), credit notes (CLX-*), proforma (PR-*)
+$invoice = $client->salesInvoices()->findByInvoiceNumber('RE-10042');
 
 // Download invoice PDF
 $pdf = $invoices->getPdf($invoiceId);
@@ -657,6 +664,9 @@ $quotations = $client->quotations();
 
 // Find all quotations for a customer
 $list = $quotations->findByCustomer($customerId);
+
+// Find by human-readable quotation number (throws NotFoundException if not found)
+$quotation = $client->quotations()->findByQuotationNumber('ANG-10042');
 
 // Check expiry
 echo $quotation->isExpired() ? 'Expired' : 'Valid until: ' . $quotation->getValidUntil()?->format('d.m.Y');

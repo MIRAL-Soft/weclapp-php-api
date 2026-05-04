@@ -12,6 +12,7 @@ use miralsoft\weclapp\api\Client\WeclappClient;
 use miralsoft\weclapp\api\Config\WeclappConfig;
 use miralsoft\weclapp\api\DTO\QuotationDTO;
 use miralsoft\weclapp\api\DTO\SalesOrderDTO;
+use miralsoft\weclapp\api\Exception\NotFoundException;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -107,5 +108,34 @@ class QuotationResourceTest extends TestCase
 
         self::assertCount(1, $quotations);
         self::assertSame('cust-1', $quotations[0]->customerId);
+    }
+
+    // -------------------------------------------------------------------------
+    // findByQuotationNumber
+    // -------------------------------------------------------------------------
+
+    public function test_find_by_quotation_number_returns_matching_quotation(): void
+    {
+        $client = $this->makeClient([
+            new Response(200, [], json_encode(['result' => [$this->quotationPayload('q-99')]])),
+        ]);
+
+        $quotation = $client->quotations()->findByQuotationNumber('A-1001');
+
+        self::assertInstanceOf(QuotationDTO::class, $quotation);
+        self::assertSame('q-99', $quotation->id);
+        self::assertSame('A-1001', $quotation->quotationNumber);
+    }
+
+    public function test_find_by_quotation_number_throws_not_found_when_missing(): void
+    {
+        $this->expectException(NotFoundException::class);
+        $this->expectExceptionMessage('A-UNKNOWN');
+
+        $client = $this->makeClient([
+            new Response(200, [], json_encode(['result' => []])),
+        ]);
+
+        $client->quotations()->findByQuotationNumber('A-UNKNOWN');
     }
 }

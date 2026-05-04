@@ -40,6 +40,33 @@ class SalesOrderResource extends AbstractResource
     }
 
     /**
+     * Find a sales order by its human-readable order number (e.g. "SO-10042").
+     *
+     * @param string $orderNumber The order number shown in the weclapp UI.
+     * @return SalesOrderDTO
+     *
+     * @throws NotFoundException   If no order with that number exists.
+     * @throws WeclappApiException
+     */
+    public function findByOrderNumber(string $orderNumber): SalesOrderDTO
+    {
+        $result = $this->list(
+            QueryBuilder::new()
+                ->filterEq('orderNumber', $orderNumber)
+                ->pageSize(1)
+        );
+
+        if (empty($result->items)) {
+            throw new NotFoundException(
+                sprintf('Sales order with number "%s" not found.', $orderNumber)
+            );
+        }
+
+        /** @var SalesOrderDTO */
+        return $result->items[0];
+    }
+
+    /**
      * Find all orders for a specific customer.
      *
      * @param string $customerId The weclapp UUID of the customer.

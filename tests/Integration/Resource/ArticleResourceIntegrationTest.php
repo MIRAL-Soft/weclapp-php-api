@@ -78,4 +78,36 @@ class ArticleResourceIntegrationTest extends IntegrationTestCase
         self::assertIsInt($count);
         self::assertGreaterThan(0, $count, 'Expected at least one article in this tenant.');
     }
+
+    public function test_find_category_id_by_number_returns_nullable_string(): void
+    {
+        $result = $this->client()->articles()->list(
+            QueryBuilder::new()->pageSize(5),
+        );
+
+        if (empty($result->items)) {
+            $this->markTestSkipped('No articles in this tenant.');
+        }
+
+        // Find an article that has an articleNumber
+        $articleWithNumber = null;
+        foreach ($result->items as $article) {
+            if (!empty($article->articleNumber)) {
+                $articleWithNumber = $article;
+                break;
+            }
+        }
+
+        if ($articleWithNumber === null) {
+            $this->markTestSkipped('No article with articleNumber found.');
+        }
+
+        $categoryId = $this->client()->articles()->findCategoryIdByNumber($articleWithNumber->articleNumber);
+
+        // Returns string ID or null — both are valid (article may not be categorised)
+        self::assertTrue(
+            $categoryId === null || is_string($categoryId),
+            'findCategoryIdByNumber() must return string|null.',
+        );
+    }
 }

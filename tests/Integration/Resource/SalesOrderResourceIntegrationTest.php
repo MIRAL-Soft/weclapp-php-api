@@ -98,4 +98,21 @@ class SalesOrderResourceIntegrationTest extends IntegrationTestCase
 
         self::assertContainsOnlyInstancesOf(SalesOrderDTO::class, $result->items);
     }
+
+    public function test_find_by_order_number_returns_same_record(): void
+    {
+        $result = $this->client()->salesOrders()->list(
+            QueryBuilder::new()->pageSize(1),
+        );
+
+        if (empty($result->items)) {
+            $this->markTestSkipped('No sales orders found in this tenant.');
+        }
+
+        $orderNumber = $result->items[0]->orderNumber;
+        $order       = $this->client()->salesOrders()->findByOrderNumber($orderNumber);
+
+        self::assertInstanceOf(SalesOrderDTO::class, $order);
+        self::assertSame($orderNumber, $order->orderNumber);
+    }
 }

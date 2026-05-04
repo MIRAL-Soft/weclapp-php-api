@@ -13,6 +13,7 @@ use miralsoft\weclapp\api\Config\WeclappConfig;
 use miralsoft\weclapp\api\DTO\SalesOrderDTO;
 use miralsoft\weclapp\api\Exception\NotFoundException;
 use miralsoft\weclapp\api\Exception\OptimisticLockException;
+use miralsoft\weclapp\api\Exception\WeclappApiException;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -115,6 +116,35 @@ class SalesOrderResourceTest extends TestCase
 
         self::assertNotNull($dt);
         self::assertSame(1711400000, $dt->getTimestamp());
+    }
+
+    // -------------------------------------------------------------------------
+    // findByOrderNumber
+    // -------------------------------------------------------------------------
+
+    public function test_find_by_order_number_returns_matching_order(): void
+    {
+        $client = $this->makeClient([
+            new Response(200, [], json_encode(['result' => [$this->orderPayload('ord-99')]])),
+        ]);
+
+        $order = $client->salesOrders()->findByOrderNumber('SO-10042');
+
+        self::assertInstanceOf(SalesOrderDTO::class, $order);
+        self::assertSame('ord-99', $order->id);
+        self::assertSame('SO-10042', $order->orderNumber);
+    }
+
+    public function test_find_by_order_number_throws_not_found_when_missing(): void
+    {
+        $this->expectException(NotFoundException::class);
+        $this->expectExceptionMessage('SO-UNKNOWN');
+
+        $client = $this->makeClient([
+            new Response(200, [], json_encode(['result' => []])),
+        ]);
+
+        $client->salesOrders()->findByOrderNumber('SO-UNKNOWN');
     }
 
     // -------------------------------------------------------------------------

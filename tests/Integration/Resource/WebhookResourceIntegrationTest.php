@@ -99,4 +99,44 @@ class WebhookResourceIntegrationTest extends IntegrationTestCase
             }
         }
     }
+
+    public function test_find_by_url_returns_matching_webhooks(): void
+    {
+        $webhooks = $this->client()->webhooks()->all();
+
+        if (empty($webhooks)) {
+            $this->markTestSkipped('No webhooks registered in this tenant.');
+        }
+
+        $url    = $webhooks[0]->url;
+        $result = $this->client()->webhooks()->findByUrl($url);
+
+        self::assertIsArray($result);
+        self::assertNotEmpty($result);
+        self::assertContainsOnlyInstancesOf(WebhookDTO::class, $result);
+
+        foreach ($result as $webhook) {
+            self::assertSame($url, $webhook->url);
+        }
+    }
+
+    public function test_find_by_entity_name_returns_matching_webhooks(): void
+    {
+        $webhooks = $this->client()->webhooks()->all();
+
+        if (empty($webhooks)) {
+            $this->markTestSkipped('No webhooks registered in this tenant.');
+        }
+
+        $entityName = $webhooks[0]->entityName;
+        $result     = $this->client()->webhooks()->findByEntityName($entityName);
+
+        self::assertIsArray($result);
+        self::assertNotEmpty($result);
+        self::assertContainsOnlyInstancesOf(WebhookDTO::class, $result);
+
+        foreach ($result as $webhook) {
+            self::assertSame($entityName, $webhook->entityName);
+        }
+    }
 }
