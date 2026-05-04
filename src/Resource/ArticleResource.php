@@ -64,6 +64,23 @@ class ArticleResource extends AbstractResource
     }
 
     /**
+     * Return the article category ID for the article with the given article number.
+     *
+     * Thin convenience wrapper around findByArticleNumber() for callers that only
+     * need the category without loading the full ArticleDTO themselves.
+     *
+     * @param string $articleNumber The article / SKU number (e.g. "ART-10042").
+     * @return string|null The weclapp UUID of the category, or null if no category is assigned.
+     *
+     * @throws NotFoundException   If no article with that number exists.
+     * @throws WeclappApiException
+     */
+    public function findCategoryIdByNumber(string $articleNumber): ?string
+    {
+        return $this->findByArticleNumber($articleNumber)->articleCategoryId;
+    }
+
+    /**
      * Find all currently active and in-stock articles.
      *
      * @return list<ArticleDTO>

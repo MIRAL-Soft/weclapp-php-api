@@ -7,6 +7,66 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased] — Branch `WeclappAPIv2`
 
+### Added — SalesOrderResource item operations (Read-Modify-Write)
+
+Three methods for modifying order line items in place. weclapp does not expose a
+dedicated item endpoint — items are embedded in the order and must be written back
+via `PUT salesOrder/id/{id}`. All three methods follow the same
+**Read → Mutate → Write** pattern and carry the current `version` field to satisfy
+weclapp's optimistic locking requirement.
+
+If another process modifies the order between the GET and the PUT, weclapp responds
+with HTTP 409 and an `OptimisticLockException` is thrown. The caller is expected to
+re-fetch the order and retry.
+
+- **`SalesOrderResource::addOrderItem(string $orderId, array $data): SalesOrderDTO`**
+
+  Appends a new line item to the order. Requires at least one of `articleId` or
+  `title` in `$data`; all other fields (quantity, unitPrice, taxId, …) are optional.
+  Throws `\InvalidArgumentException` if neither field is provided.
+
+  ```php
+  $updated = $client->salesOrders()->addOrderItem($orderId, [
+      'articleId' => 'art-42',
+      'quantity'  => '3.00',
+  ]);
+  ```
+
+- **`SalesOrderResource::updateOrderItem(string $orderId, string $itemId, array $data): SalesOrderDTO`**
+
+  Merges `$data` into the existing item identified by `$itemId`. Only the fields
+  present in `$data` change; all other item fields retain their current values.
+  Throws `NotFoundException` if no item with that ID exists in the order.
+
+  ```php
+  $updated = $client->salesOrders()->updateOrderItem($orderId, $itemId, [
+      'quantity'  => '5.00',
+      'unitPrice' => '8.50',
+  ]);
+  ```
+
+- **`SalesOrderResource::removeOrderItem(string $orderId, string $itemId): SalesOrderDTO`**
+
+  Removes the item identified by `$itemId` from the order.
+  Throws `NotFoundException` if no item with that ID exists.
+
+  ```php
+  $updated = $client->salesOrders()->removeOrderItem($orderId, $itemId);
+  ```
+
+### Added — ArticleResource::findCategoryIdByNumber()
+
+- **`ArticleResource::findCategoryIdByNumber(string $articleNumber): ?string`**
+
+  Convenience wrapper: looks up an article by its SKU and returns its
+  `articleCategoryId`. Returns `null` when the article has no category assigned.
+  Throws `NotFoundException` when no article with that number exists.
+
+  ```php
+  $categoryId = $client->articles()->findCategoryIdByNumber('ART-10042');
+  // → "cat-uuid" or null
+  ```
+
 ### Fixed — getDisplayName() uses partyType instead of company presence
 
 All three party-based DTOs (`CustomerDTO`, `PartyDTO`, `SupplierDTO`) checked

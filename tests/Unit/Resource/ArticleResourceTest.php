@@ -118,4 +118,47 @@ class ArticleResourceTest extends TestCase
         $client->articles()->delete('art-1');
         $this->addToAssertionCount(1);
     }
+
+    // -------------------------------------------------------------------------
+    // findCategoryIdByNumber
+    // -------------------------------------------------------------------------
+
+    public function test_find_category_id_by_number_returns_category_id(): void
+    {
+        $payload                     = $this->articlePayload('art-1', 'ART-001');
+        $payload['articleCategoryId'] = 'cat-99';
+
+        $client = $this->makeClient([
+            new Response(200, [], json_encode(['result' => [$payload]])),
+        ]);
+
+        $categoryId = $client->articles()->findCategoryIdByNumber('ART-001');
+
+        self::assertSame('cat-99', $categoryId);
+    }
+
+    public function test_find_category_id_by_number_returns_null_when_no_category_assigned(): void
+    {
+        $payload = $this->articlePayload('art-1', 'ART-001');
+        // articleCategoryId absent → null
+
+        $client = $this->makeClient([
+            new Response(200, [], json_encode(['result' => [$payload]])),
+        ]);
+
+        $categoryId = $client->articles()->findCategoryIdByNumber('ART-001');
+
+        self::assertNull($categoryId);
+    }
+
+    public function test_find_category_id_by_number_throws_when_article_not_found(): void
+    {
+        $this->expectException(NotFoundException::class);
+
+        $client = $this->makeClient([
+            new Response(200, [], json_encode(['result' => []])),
+        ]);
+
+        $client->articles()->findCategoryIdByNumber('UNKNOWN');
+    }
 }

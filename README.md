@@ -345,6 +345,10 @@ $articles = $client->articles();
 // Find by article number (SKU)
 $article = $articles->findByArticleNumber('ART-001');
 
+// Convenience: get the category ID for a given SKU without loading the full DTO
+// Returns null when no category is assigned; throws NotFoundException if article missing
+$categoryId = $articles->findCategoryIdByNumber('ART-001');
+
 // Find all articles in a category
 $articles = $articles->findByCategory($categoryId);
 
@@ -420,6 +424,29 @@ foreach ($order->orderItems as $item) {
     echo '   Net amount : ' . $item->getNetAmount() . PHP_EOL;
     echo '   Shipped    : ' . ($item->shipped ? 'yes' : 'no') . PHP_EOL;
 }
+
+// Mutate line items (Read-Modify-Write — version is handled automatically)
+//
+// weclapp has no dedicated item endpoint: items are embedded in the order
+// and written back via PUT. All three methods fetch the order first, mutate
+// the item list, then PUT the order back with its current version to satisfy
+// optimistic locking. If another process modified the order concurrently,
+// an OptimisticLockException is thrown — re-fetch and retry.
+
+// Add a new item (requires at least "articleId" or "title")
+$updated = $client->salesOrders()->addOrderItem($orderId, [
+    'articleId' => 'art-42',
+    'quantity'  => '2.00',
+]);
+
+// Update an existing item (only the fields you pass are changed)
+$updated = $client->salesOrders()->updateOrderItem($orderId, $itemId, [
+    'quantity'  => '5.00',
+    'unitPrice' => '8.50',
+]);
+
+// Remove an item
+$updated = $client->salesOrders()->removeOrderItem($orderId, $itemId);
 ```
 
 ### Sales Invoices
