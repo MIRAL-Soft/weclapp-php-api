@@ -679,38 +679,73 @@ use miralsoft\weclapp\api\Enum\WebhookEntityName;
 
 $webhooks = $client->webhooks();
 
-// Register a webhook that fires on any party change (create + update + delete)
-$webhook = $webhooks->register(
-    entityName: WebhookEntityName::Party->value,           // "party" covers customers, contacts, suppliers
-    url:        'https://my-app.example.com/weclapp',      // publicly reachable URL
+// ── Idempotent setup ─────────────────────────────────────────────────────────
+//
+// ensureSubscription() is the recommended setup method. Call it on every
+// application start — it creates the subscription only if it does not yet exist,
+// returns the existing one unchanged if all flags are already set, or merges
+// flags additively if a new event type needs to be added.
+// No duplicate subscriptions are ever created.
+
+$client->webhooks()->ensureSubscription(
+    entityName: WebhookEntityName::SalesOrder->value,
+    url:        'https://my-app.example.com/webhooks/weclapp',
+    atCreate:   true,
+    atUpdate:   true,
+);
+
+$client->webhooks()->ensureSubscription(
+    entityName: WebhookEntityName::Customer->value,   // 'customer' — distinct from 'party'
+    url:        'https://my-app.example.com/webhooks/weclapp',
     atCreate:   true,
     atUpdate:   true,
     atDelete:   true,
 );
 
-// Register a webhook that fires only when a sales order is created
+// ── One-shot registration (use register() when you control the lifecycle) ────
+
 $webhook = $webhooks->register(
-    entityName: WebhookEntityName::SalesOrder->value,
-    url:        'https://my-app.example.com/weclapp',
+    entityName: WebhookEntityName::Party->value,      // 'party' covers all party types
+    url:        'https://my-app.example.com/webhooks/weclapp',
     atCreate:   true,
+    atUpdate:   true,
+    atDelete:   true,
 );
 
-// Check webhook status
-echo $webhook->entityName;    // e.g. "salesOrder"
-echo $webhook->url;           // the registered URL
-var_dump($webhook->atCreate); // true
-var_dump($webhook->isActive()); // true when deactivatedDate is null
-echo $webhook->errorMessage;  // last delivery error, if any
+// ── Status check ─────────────────────────────────────────────────────────────
+
+// All subscriptions pointing to a URL (useful for setup status pages)
+$mine = $webhooks->findByUrl('https://my-app.example.com/webhooks/weclapp');
+foreach ($mine as $hook) {
+    echo $hook->entityName . ': ' . ($hook->isActive() ? 'active' : 'INACTIVE') . PHP_EOL;
+    if ($hook->errorMessage !== null) {
+        echo '  Last error: ' . $hook->errorMessage . PHP_EOL;
+    }
+}
+
+// All subscriptions for a specific entity
+$orderHooks = $webhooks->findByEntityName(WebhookEntityName::SalesOrder->value);
+
+// ── Lifecycle ─────────────────────────────────────────────────────────────────
+
+// Soft-deactivate (preserves the subscription; weclapp stops delivering events)
+$webhooks->deactivate($webhook->id);
+
+// Reactivate (clears deactivatedDate — see method docblock for caveats)
+$webhooks->reactivate($webhook->id);
+
+// Permanent deletion
+$webhooks->delete($webhook->id);
 
 // List all registered webhooks
 $all = $webhooks->all();
-
-// Remove a webhook
-$webhooks->delete($webhook->id);
 ```
 
-Available entity names (see `WebhookEntityName` enum):
-`party`, `article`, `salesOrder`, `salesInvoice`, `quotation`, `purchaseOrder`, `purchaseInvoice`, `shipment`, `contract`, `ticket`
+> **Note on entityName values:**
+> `customer`, `contact` and `party` are **distinct** entityNames — all three exist in parallel.
+> There is **no** `salesOrderItem` — item changes fire as `salesOrder` update events
+> containing the full order state with all items.
+> See the `WebhookEntityName` enum for all 117+ verified values with `@beta` annotations.
 
 ---
 

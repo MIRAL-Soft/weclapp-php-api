@@ -7,6 +7,51 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased] — Branch `WeclappAPIv2`
 
+### Added — WebhookResource idempotent setup helpers + full entityName enum
+
+**`WebhookEntityName` enum — expanded from 10 to 121 cases**
+
+Verified against a live weclapp tenant's webhook configuration UI on 2026-05-04.
+The 117 confirmed values are organised into categories (Party/CRM, Articles,
+Sales, Purchasing, Finance, HR, Tasks, Communication, Users, Misc).
+Four legacy values retained from the previous library version are annotated as
+potentially module-specific (`PurchaseOrder`, `Shipment`, `Ticket`, `Contract`).
+Beta-quality entity names are marked with `@beta` in their case docblock.
+
+Key findings documented in the enum:
+- `customer`, `contact` and `party` are **distinct** entityNames — all three exist.
+- There is **no** `salesOrderItem` entityName — item changes fire as `salesOrder` update events.
+- `webhook` itself is a valid entityName (meta-subscriptions).
+
+**`WebhookResource` — 6 new methods**
+
+- **`ensureSubscription(string $entityName, string $url, bool $atCreate, bool $atUpdate, bool $atDelete, string $requestMethod): WebhookDTO`**
+
+  Idempotent upsert: creates the subscription if it does not exist, returns the
+  existing one unchanged if all requested flags are already set, or merges flags
+  additively and updates if a new flag is needed. Safe to call on every application
+  start with no duplicate subscriptions created.
+
+  ```php
+  // Safe to call repeatedly — only writes to the API when something actually changes
+  $client->webhooks()->ensureSubscription(
+      entityName: WebhookEntityName::SalesOrder->value,
+      url:        'https://my-app.example.com/webhooks/weclapp',
+      atCreate:   true,
+      atUpdate:   true,
+  );
+  ```
+
+- **`findByUrl(string $url): list<WebhookDTO>`** — all subscriptions pointing to a given URL (exact match, client-side filter).
+- **`findByEntityName(string $entityName): list<WebhookDTO>`** — all subscriptions for a given entity type (client-side filter).
+- **`deactivate(string $id): WebhookDTO`** — soft-deactivates a webhook by setting `deactivatedDate`; idempotent.
+- **`reactivate(string $id): WebhookDTO`** — clears `deactivatedDate`; idempotent. ⚠️ Not yet verified against live API — see method docblock.
+- **`delete(string $id): void`** — permanent deletion (explicit typed override).
+
+**Research documentation** added as a block comment in `WebhookResource`:
+endpoint, HTTP methods, schema, entityName findings, incoming payload structure
+(unconfirmed — log live traffic to verify), deactivation mechanics, no-HMAC note.
+
 ### Added — SalesOrderResource item operations (Read-Modify-Write)
 
 Three methods for modifying order line items in place. weclapp does not expose a
