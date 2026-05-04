@@ -7,6 +7,38 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased] — Branch `WeclappAPIv2`
 
+### Added — Write integration tests + dry-run integration tests
+
+**`DryRunIntegrationTest`** (safe against any tenant, no `WECLAPP_ALLOW_WRITES` required):
+Tests the dry-run feature end-to-end against the real weclapp API:
+- `test_dry_run_customer_update_returns_dto_without_id` — PUT with `?dryRun=true`, verifies `id === ''`
+- `test_dry_run_customer_update_reflects_changed_field` — verifies the submitted field value appears in the response
+- `test_dry_run_sales_order_create_with_real_customer_id` — uses a real customerId from the tenant; verifies 200 response
+- `test_dry_run_sales_order_create_throws_on_invalid_customer` — verifies `ValidationException` for bogus customerId
+- `test_dry_run_sales_order_update_returns_dto_without_id`
+- `test_dry_run_add_order_item_validates_against_real_order` — text-only position; GET is real, PUT is dry-run
+- Three `isDryRun()` sanity checks
+
+**`WebhookWriteIntegrationTest`** (opt-in: requires `WECLAPP_ALLOW_WRITES=true`):
+First true write-capable integration tests in the suite. All tests clean up after
+themselves (try/finally) even if assertions fail, keeping the tenant clean.
+
+```bash
+WECLAPP_ALLOW_WRITES=true php vendor/bin/phpunit --testsuite Write
+```
+
+- `test_create_webhook_returns_dto_with_id`
+- `test_find_created_webhook_by_id`
+- `test_update_webhook_adds_atupdate_flag` — update + re-fetch to confirm persistence
+- `test_ensure_subscription_creates_if_not_exists`
+- `test_ensure_subscription_is_idempotent_when_unchanged` — version must be unchanged on second call
+- `test_ensure_subscription_merges_flags_additively` — atCreate preserved when atUpdate added
+- `test_delete_webhook_throws_not_found_on_second_call`
+- `test_deactivate_webhook_sets_deactivated_date`
+- `test_find_by_url_returns_created_webhook`
+
+**`phpunit.xml`:** New `Write` testsuite pointing to write-enabled test files.
+
 ### Added — Dry-run mode (`AbstractResource::withDryRun()`)
 
 All resource classes now support weclapp's built-in dry-run mechanism

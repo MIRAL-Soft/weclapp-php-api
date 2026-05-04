@@ -7,6 +7,12 @@
     <testsuite name="Integration">
       <directory>tests/Integration</directory>
     </testsuite>
+    <!-- "Write" is a convenience alias that runs only the write-enabled integration tests.
+         These tests actually create and delete records in the live tenant.
+         Requires: WECLAPP_TENANT, WECLAPP_TOKEN, and WECLAPP_ALLOW_WRITES=true -->
+    <testsuite name="Write">
+      <file>tests/Integration/Resource/WebhookWriteIntegrationTest.php</file>
+    </testsuite>
   </testsuites>
   <php>
     <ini name="error_reporting" value="-1"/>

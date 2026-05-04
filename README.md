@@ -1152,7 +1152,7 @@ $result = $client->customers()->list(); // uses mocked response
 ### Integration Tests (live API — run on demand)
 
 Integration tests call the real weclapp API and verify that responses are structured
-as expected. They are read-only — no data is created or modified.
+as expected.
 
 **Setup:**
 
@@ -1167,7 +1167,7 @@ WECLAPP_TENANT=your-tenant   # subdomain of your weclapp URL
 WECLAPP_TOKEN=your-api-token
 ```
 
-**Run:**
+**Run (read-only + dry-run — safe against any tenant):**
 
 ```bash
 php vendor/bin/phpunit --testsuite Integration
@@ -1182,12 +1182,37 @@ php vendor/bin/phpunit   # Unit: OK · Integration: S (skipped)
 
 **What is tested:**
 
-| Test class | Checks |
+| Test class | Nature | Checks |
+|---|---|---|
+| `CustomerResourceIntegrationTest` | read-only | list, find by ID, count, `modifiedSince` filter |
+| `SalesInvoiceResourceIntegrationTest` | read-only | list, find by ID, status enum, count |
+| `SalesOrderResourceIntegrationTest` | read-only | list, find by ID, status enum, `findByOrderNumber` |
+| `ArticleResourceIntegrationTest` | read-only | list, find by number, NotFoundException, `findCategoryIdByNumber` |
+| `NumberRangeResourceIntegrationTest` | read-only | at least one range, all types known, proforma prefix |
+| `WebhookResourceIntegrationTest` | read-only | list, count, required fields, `findByUrl`, `findByEntityName` |
+| `DryRunIntegrationTest` | **dry-run** | real API validates payloads; nothing is persisted |
+
+### Write Tests (live API — opt-in only)
+
+Write tests create, update and delete **real records** in the tenant.
+They are gated behind `WECLAPP_ALLOW_WRITES=true` and skipped if that variable is not set.
+
+**Run:**
+
+```bash
+# In tests/.env.test, add:
+WECLAPP_ALLOW_WRITES=true
+
+# Or inline:
+WECLAPP_ALLOW_WRITES=true php vendor/bin/phpunit --testsuite Write
+```
+
+The `Write` suite is a named alias for the write test files in `phpunit.xml`.
+All write tests clean up after themselves (try/finally) so the tenant remains pristine.
+
+| Test class | Creates / Deletes |
 |---|---|
-| `CustomerResourceIntegrationTest` | list, find by ID, count matches total, `modifiedSince` filter |
-| `SalesInvoiceResourceIntegrationTest` | list, find by ID, status maps to known enum, count matches total |
-| `ArticleResourceIntegrationTest` | list, find by number, unknown number throws `NotFoundException`, count |
-| `NumberRangeResourceIntegrationTest` | at least one range exists, all types are known, proforma prefix |
+| `WebhookWriteIntegrationTest` | Webhook records — full Create → Update → Delete lifecycle, `ensureSubscription` idempotency, `deactivate`, `findByUrl` after creation |
 
 ---
 
