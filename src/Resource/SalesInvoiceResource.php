@@ -64,10 +64,8 @@ class SalesInvoiceResource extends AbstractResource
      * - PERSON       → "First Last"
      *
      * Resolution order:
-     * 1. Inline customerName from the invoice (if the API returned it).
-     * 2. party/id/{partyId} lookup via the weclapp party endpoint.
-     * 3. Inline customerNumber as a last resort.
-     * 4. 'Unknown' if nothing is available.
+     * 1. party/id/{customerId} lookup via the weclapp party endpoint.
+     * 2. 'Unknown' if the customerId is empty or the party cannot be resolved.
      *
      * Party lookups are cached in memory for the lifetime of this resource
      * instance, so processing multiple invoices for the same customer only
@@ -83,18 +81,14 @@ class SalesInvoiceResource extends AbstractResource
      */
     public function resolveCustomerDisplayName(SalesInvoiceDTO $invoice): string
     {
-        if ($invoice->customerName !== null) {
-            return $invoice->customerName;
-        }
-
-        if ($invoice->partyId !== null) {
-            $party = $this->fetchParty($invoice->partyId);
+        if ($invoice->customerId !== '') {
+            $party = $this->fetchParty($invoice->customerId);
             if ($party !== null) {
                 return $party->getDisplayName();
             }
         }
 
-        return $invoice->customerNumber ?? 'Unknown';
+        return 'Unknown';
     }
 
     /**

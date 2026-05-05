@@ -115,4 +115,56 @@ class SalesOrderResourceIntegrationTest extends IntegrationTestCase
         self::assertInstanceOf(SalesOrderDTO::class, $order);
         self::assertSame($orderNumber, $order->orderNumber);
     }
+
+    public function test_find_by_customer_returns_sales_order_dtos(): void
+    {
+        // Use the test-order fixture to get a known-good customerId.
+        $anchor     = $this->testSalesOrder();
+        $customerId = $anchor?->customerId;
+
+        if (empty($customerId)) {
+            // Fallback: take the customerId from the first list entry.
+            $result     = $this->client()->salesOrders()->list(QueryBuilder::new()->pageSize(1));
+            $customerId = $result->items[0]->customerId ?? null;
+        }
+
+        if (empty($customerId)) {
+            $this->markTestSkipped('Could not determine a customerId to filter by.');
+        }
+
+        $orders = $this->client()->salesOrders()->findByCustomer($customerId);
+
+        self::assertIsArray($orders);
+        self::assertContainsOnlyInstancesOf(SalesOrderDTO::class, $orders);
+        // The order we used to obtain the customerId must appear in the result.
+        if ($anchor !== null) {
+            $ids = array_map(static fn (SalesOrderDTO $o): string => $o->id, $orders);
+            self::assertContains($anchor->id, $ids, 'The test order must be in the result for its own customerId.');
+        }
+    }
+
+    public function test_find_by_status_returns_sales_order_dtos(): void
+    {
+        // Use the test-order fixture so we know at least one record with this status exists.
+        $anchor = $this->testSalesOrder();
+        $status = $anchor?->status;
+
+        if (empty($status)) {
+            // Fallback: use the status of the first list entry.
+            $result = $this->client()->salesOrders()->list(QueryBuilder::new()->pageSize(1));
+            $status = $result->items[0]->status ?? null;
+        }
+
+        if (empty($status)) {
+            $this->markTestSkipped('Could not determine a status value to filter by.');
+        }
+
+        $orders = $this->client()->salesOrders()->findByStatus($status);
+
+        self::assertIsArray($orders);
+        self::assertContainsOnlyInstancesOf(SalesOrderDTO::class, $orders);
+        foreach ($orders as $order) {
+            self::assertSame($status, $order->status, 'findByStatus() must only return orders with the requested status.');
+        }
+    }
 }

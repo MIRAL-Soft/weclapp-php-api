@@ -300,6 +300,45 @@ class WebhookWriteIntegrationTest extends IntegrationTestCase
         }
     }
 
+    public function test_reactivate_webhook_clears_deactivated_date(): void
+    {
+        $url     = $this->uniqueTestUrl();
+        $webhook = null;
+
+        try {
+            $webhook = $this->client()->webhooks()->register(
+                entityName: 'article',
+                url:        $url,
+                atCreate:   true,
+            );
+
+            self::assertTrue($webhook->isActive(), 'Webhook must be active immediately after creation.');
+
+            // Step 1: deactivate
+            $deactivated = $this->client()->webhooks()->deactivate($webhook->id);
+            self::assertFalse($deactivated->isActive(), 'Webhook must be inactive after deactivate().');
+            self::assertNotNull($deactivated->deactivatedDate, 'deactivatedDate must be set after deactivate().');
+
+            // Step 2: reactivate — the docblock notes this has not been verified live;
+            // this test provides that verification. If weclapp rejects PUT with
+            // deactivatedDate: null, WeclappApiException will be thrown and the test
+            // will fail with a meaningful message.
+            $reactivated = $this->client()->webhooks()->reactivate($deactivated->id);
+            self::assertTrue($reactivated->isActive(), 'Webhook must be active again after reactivate().');
+            self::assertNull($reactivated->deactivatedDate, 'deactivatedDate must be null after reactivate().');
+
+            // Confirm persistence via a fresh GET
+            $refreshed = $this->client()->webhooks()->find($webhook->id);
+            self::assertTrue($refreshed->isActive(), 'Re-fetched webhook must still be active.');
+
+            $webhook = $refreshed;
+        } finally {
+            if ($webhook !== null && $webhook->id !== '') {
+                try { $this->client()->webhooks()->delete($webhook->id); } catch (\Throwable) {}
+            }
+        }
+    }
+
     public function test_find_by_url_returns_created_webhook(): void
     {
         $url     = $this->uniqueTestUrl();

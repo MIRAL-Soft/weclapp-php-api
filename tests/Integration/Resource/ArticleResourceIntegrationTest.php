@@ -79,6 +79,31 @@ class ArticleResourceIntegrationTest extends IntegrationTestCase
         self::assertGreaterThan(0, $count, 'Expected at least one article in this tenant.');
     }
 
+    public function test_cursor_yields_article_dtos(): void
+    {
+        // cursor() paginates lazily — use a tiny page size to force at least one
+        // page boundary even on tenants with few articles.
+        $cursor = $this->client()->articles()->cursor(
+            QueryBuilder::new()->pageSize(2),
+        );
+
+        self::assertInstanceOf(\Generator::class, $cursor);
+
+        $count = 0;
+        foreach ($cursor as $article) {
+            self::assertInstanceOf(ArticleDTO::class, $article);
+            self::assertNotEmpty($article->id);
+
+            if (++$count >= 5) {
+                break; // Five items are enough to confirm the generator works.
+            }
+        }
+
+        if ($count === 0) {
+            $this->markTestSkipped('No articles in this tenant — cannot test cursor().');
+        }
+    }
+
     public function test_find_category_id_by_number_returns_nullable_string(): void
     {
         $result = $this->client()->articles()->list(

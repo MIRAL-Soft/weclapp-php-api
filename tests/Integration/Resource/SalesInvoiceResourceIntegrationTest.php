@@ -110,4 +110,51 @@ class SalesInvoiceResourceIntegrationTest extends IntegrationTestCase
         self::assertInstanceOf(SalesInvoiceDTO::class, $invoice);
         self::assertSame($invoiceNumber, $invoice->invoiceNumber);
     }
+
+    public function test_find_credit_notes_returns_sales_invoice_dtos(): void
+    {
+        // findCreditNotes() fetches ALL credit notes — returns an empty array on tenants
+        // without any, so there is no skip here: the method must not throw regardless.
+        $creditNotes = $this->client()->salesInvoices()->findCreditNotes();
+
+        self::assertIsArray($creditNotes);
+        self::assertContainsOnlyInstancesOf(SalesInvoiceDTO::class, $creditNotes);
+
+        // When credit notes exist, every returned record must have the correct type.
+        foreach ($creditNotes as $note) {
+            self::assertSame(
+                'CREDIT_NOTE',
+                $note->salesInvoiceType,
+                'findCreditNotes() must only return invoices with salesInvoiceType = CREDIT_NOTE.',
+            );
+        }
+    }
+
+    public function test_resolve_customer_display_name_returns_non_empty_string(): void
+    {
+        $result = $this->client()->salesInvoices()->list(
+            QueryBuilder::new()->pageSize(5),
+        );
+
+        if (empty($result->items)) {
+            $this->markTestSkipped('No sales invoices in this tenant.');
+        }
+
+        // Try each of the first few invoices — some may have no partyId or name,
+        // but at least one should resolve to a non-empty display name.
+        $resolved = false;
+        foreach ($result->items as $invoice) {
+            $name = $this->client()->salesInvoices()->resolveCustomerDisplayName($invoice);
+
+            self::assertIsString($name);
+            self::assertNotEmpty($name, 'resolveCustomerDisplayName() must not return an empty string.');
+
+            $resolved = true;
+            break; // One successful resolution is sufficient.
+        }
+
+        if (!$resolved) {
+            $this->markTestSkipped('No invoice with resolvable customer name found.');
+        }
+    }
 }

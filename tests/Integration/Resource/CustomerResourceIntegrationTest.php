@@ -81,4 +81,36 @@ class CustomerResourceIntegrationTest extends IntegrationTestCase
 
         self::assertContainsOnlyInstancesOf(CustomerDTO::class, $result->items);
     }
+
+    public function test_find_by_customer_number_returns_same_record(): void
+    {
+        // Prefer the configured test customer (stable, not a random list entry).
+        $customer = $this->testCustomer();
+
+        if ($customer === null) {
+            // Fallback: pick the first customer from the list and use their number.
+            $result = $this->client()->customers()->list(
+                QueryBuilder::new()->pageSize(1),
+            );
+
+            if (empty($result->items) || empty($result->items[0]->customerNumber)) {
+                $this->markTestSkipped('No customer with a customerNumber found in this tenant.');
+            }
+
+            $customer = $result->items[0];
+        }
+
+        $found = $this->client()->customers()->findByCustomerNumber($customer->customerNumber);
+
+        self::assertInstanceOf(CustomerDTO::class, $found);
+        self::assertSame($customer->customerNumber, $found->customerNumber);
+        self::assertSame($customer->id, $found->id);
+    }
+
+    public function test_find_by_customer_number_throws_not_found_for_unknown(): void
+    {
+        $this->expectException(\miralsoft\weclapp\api\Exception\NotFoundException::class);
+
+        $this->client()->customers()->findByCustomerNumber('__THIS_CUSTOMER_DOES_NOT_EXIST__');
+    }
 }
