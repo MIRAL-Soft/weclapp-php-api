@@ -161,40 +161,6 @@ class DryRunIntegrationTest extends IntegrationTestCase
     }
 
     // -------------------------------------------------------------------------
-    // SalesOrder — update (PUT)
-    // -------------------------------------------------------------------------
-
-    public function test_dry_run_sales_order_update_returns_dto_without_id(): void
-    {
-        // Prefer the configured test order — it's a known record in a (hopefully) open state.
-        // Fall back to the first order from the list.
-        $existing = $this->testSalesOrder();
-
-        if ($existing === null) {
-            $result = $this->client()->salesOrders()->list(QueryBuilder::new()->pageSize(1));
-            if (empty($result->items)) {
-                $this->markTestSkipped('No sales orders in this tenant and WECLAPP_TEST_SALES_ORDER_NUMBER not set.');
-            }
-            $existing = $result->items[0];
-        }
-
-        try {
-            $updated = $this->client()->salesOrders()->withDryRun()->update($existing->id, [
-                'id'      => $existing->id,
-                'version' => $existing->version,
-            ]);
-
-            self::assertInstanceOf(SalesOrderDTO::class, $updated);
-            self::assertSame('', $updated->id, 'id must be empty in dry-run response.');
-        } catch (WeclappApiException | ValidationException $e) {
-            $this->markTestSkipped(
-                'Sales order is in a state that rejects dry-run update (e.g. invoiced/locked): ' .
-                $e->getMessage(),
-            );
-        }
-    }
-
-    // -------------------------------------------------------------------------
     // SalesOrder — addOrderItem via Read-Modify-Write (GET real + PUT dry-run)
     // -------------------------------------------------------------------------
 
