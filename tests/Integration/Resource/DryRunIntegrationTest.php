@@ -115,13 +115,17 @@ class DryRunIntegrationTest extends IntegrationTestCase
 
     public function test_dry_run_sales_order_create_with_real_customer_id(): void
     {
-        // Prefer WECLAPP_TEST_CUSTOMER_ID for deterministic results; fall back to list()
-        $customerId = $this->testCustomerId();
+        // Priority: customerId from configured test order → configured test customer → first from list()
+        $customerId = $this->testSalesOrder()?->customerId
+            ?: $this->testCustomerId();
 
-        if ($customerId === null) {
+        if ($customerId === null || $customerId === '') {
             $customers = $this->client()->customers()->list(QueryBuilder::new()->pageSize(1));
             if (empty($customers->items)) {
-                $this->markTestSkipped('No customers in this tenant and WECLAPP_TEST_CUSTOMER_ID not set.');
+                $this->markTestSkipped(
+                    'No customers in this tenant and neither WECLAPP_TEST_SALES_ORDER_NUMBER ' .
+                    'nor WECLAPP_TEST_CUSTOMER_NUMBER are configured.',
+                );
             }
             $customerId = $customers->items[0]->id;
         }
@@ -162,13 +166,17 @@ class DryRunIntegrationTest extends IntegrationTestCase
 
     public function test_dry_run_sales_order_update_returns_dto_without_id(): void
     {
-        $result = $this->client()->salesOrders()->list(QueryBuilder::new()->pageSize(1));
+        // Prefer the configured test order — it's a known record in a (hopefully) open state.
+        // Fall back to the first order from the list.
+        $existing = $this->testSalesOrder();
 
-        if (empty($result->items)) {
-            $this->markTestSkipped('No sales orders in this tenant.');
+        if ($existing === null) {
+            $result = $this->client()->salesOrders()->list(QueryBuilder::new()->pageSize(1));
+            if (empty($result->items)) {
+                $this->markTestSkipped('No sales orders in this tenant and WECLAPP_TEST_SALES_ORDER_NUMBER not set.');
+            }
+            $existing = $result->items[0];
         }
-
-        $existing = $result->items[0];
 
         try {
             $updated = $this->client()->salesOrders()->withDryRun()->update($existing->id, [
@@ -192,17 +200,21 @@ class DryRunIntegrationTest extends IntegrationTestCase
 
     public function test_dry_run_add_order_item_validates_against_real_order(): void
     {
-        $result = $this->client()->salesOrders()->list(QueryBuilder::new()->pageSize(5));
+        $existing = $this->testSalesOrder();
 
-        if (empty($result->items)) {
-            $this->markTestSkipped('No sales orders in this tenant.');
+        if ($existing === null) {
+            $result = $this->client()->salesOrders()->list(QueryBuilder::new()->pageSize(5));
+            if (empty($result->items)) {
+                $this->markTestSkipped('No sales orders in this tenant and WECLAPP_TEST_SALES_ORDER_NUMBER not set.');
+            }
+            $existing = $result->items[0];
         }
 
         try {
             // addOrderItem() does a real GET (to get current items + version), then a
             // dry-run PUT — so the payload is validated against the real order state.
             $order = $this->client()->salesOrders()->withDryRun()->addOrderItem(
-                $result->items[0]->id,
+                $existing->id,
                 ['title' => '[DRY-RUN] Test position — safe to ignore'],
             );
 
@@ -222,12 +234,17 @@ class DryRunIntegrationTest extends IntegrationTestCase
 
     public function test_dry_run_quotation_create_with_real_customer_id(): void
     {
-        $customerId = $this->testCustomerId();
+        // Priority: configured test customer → customerId from test order → first from list()
+        $customerId = $this->testCustomerId()
+            ?: $this->testSalesOrder()?->customerId;
 
-        if ($customerId === null) {
+        if ($customerId === null || $customerId === '') {
             $customers = $this->client()->customers()->list(QueryBuilder::new()->pageSize(1));
             if (empty($customers->items)) {
-                $this->markTestSkipped('No customers in this tenant and WECLAPP_TEST_CUSTOMER_ID not set.');
+                $this->markTestSkipped(
+                    'No customers in this tenant and neither WECLAPP_TEST_CUSTOMER_NUMBER ' .
+                    'nor WECLAPP_TEST_SALES_ORDER_NUMBER are configured.',
+                );
             }
             $customerId = $customers->items[0]->id;
         }
@@ -415,13 +432,17 @@ class DryRunIntegrationTest extends IntegrationTestCase
     public function test_dry_run_contact_create_returns_dto(): void
     {
         // A contact needs a parent party (the organisation it belongs to).
-        // We reuse the configured test customer for this — it acts as the parent.
-        $parentId = $this->testCustomerId();
+        // Priority: configured test customer → customerId from test order → first from list()
+        $parentId = $this->testCustomerId()
+            ?: $this->testSalesOrder()?->customerId;
 
-        if ($parentId === null) {
+        if ($parentId === null || $parentId === '') {
             $customers = $this->client()->customers()->list(QueryBuilder::new()->pageSize(1));
             if (empty($customers->items)) {
-                $this->markTestSkipped('No customers in this tenant and WECLAPP_TEST_CUSTOMER_ID not set.');
+                $this->markTestSkipped(
+                    'No customers in this tenant and neither WECLAPP_TEST_CUSTOMER_NUMBER ' .
+                    'nor WECLAPP_TEST_SALES_ORDER_NUMBER are configured.',
+                );
             }
             $parentId = $customers->items[0]->id;
         }

@@ -6,6 +6,8 @@ namespace miralsoft\weclapp\api\Tests\Integration;
 
 use miralsoft\weclapp\api\Client\WeclappClient;
 use miralsoft\weclapp\api\Config\WeclappConfig;
+use miralsoft\weclapp\api\DTO\CustomerDTO;
+use miralsoft\weclapp\api\DTO\SalesOrderDTO;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -31,6 +33,18 @@ abstract class IntegrationTestCase extends TestCase
 
     /** Tracks whether the .env.test file has already been loaded. */
     private static bool $envLoaded = false;
+
+    /** Resolved test customer DTO (null = not configured or not found). */
+    private static ?CustomerDTO $testCustomerCache = null;
+
+    /** Whether testCustomer() has already been attempted in this process. */
+    private static bool $testCustomerResolved = false;
+
+    /** Resolved test sales order DTO (null = not configured or not found). */
+    private static ?SalesOrderDTO $testSalesOrderCache = null;
+
+    /** Whether testSalesOrder() has already been attempted in this process. */
+    private static bool $testSalesOrderResolved = false;
 
     /**
      * Returns the live WeclappClient.
@@ -72,20 +86,90 @@ abstract class IntegrationTestCase extends TestCase
     }
 
     /**
-     * Returns the weclapp internal ID of the dedicated test customer, or null
-     * when WECLAPP_TEST_CUSTOMER_ID is not configured.
+     * Returns the dedicated test customer as a fully resolved CustomerDTO, or
+     * null when WECLAPP_TEST_CUSTOMER_NUMBER is not set or the customer is not found.
      *
-     * Tests that need a real customer should prefer this over fetching the first
-     * customer from a list — it makes tests deterministic and avoids operating on
-     * random production data.
+     * The customer is looked up once per PHPUnit process via findByCustomerNumber()
+     * and the result is cached. Use this instead of hardcoding IDs — customer
+     * numbers are stable, visible in the weclapp UI and survive data migrations.
+     *
+     * Configure in tests/.env.test:
+     *   WECLAPP_TEST_CUSTOMER_NUMBER=K-10042
+     */
+    final protected function testCustomer(): ?CustomerDTO
+    {
+        if (self::$testCustomerResolved) {
+            return self::$testCustomerCache;
+        }
+
+        self::$testCustomerResolved = true;
+        $this->loadEnvFile();
+
+        $number = trim((string) (getenv('WECLAPP_TEST_CUSTOMER_NUMBER') ?: ($_ENV['WECLAPP_TEST_CUSTOMER_NUMBER'] ?? '')));
+
+        if ($number === '') {
+            return null;
+        }
+
+        try {
+            self::$testCustomerCache = $this->client()->customers()->findByCustomerNumber($number);
+        } catch (\Throwable) {
+            self::$testCustomerCache = null;
+        }
+
+        return self::$testCustomerCache;
+    }
+
+    /**
+     * Convenience: returns the weclapp internal ID of the dedicated test customer,
+     * or null when the customer is not configured or not found.
+     *
+     * Resolves via testCustomer() → findByCustomerNumber() under the hood.
      */
     final protected function testCustomerId(): ?string
     {
+        $customer = $this->testCustomer();
+
+        return ($customer !== null && $customer->id !== '') ? $customer->id : null;
+    }
+
+    /**
+     * Returns the dedicated test sales order as a fully resolved SalesOrderDTO, or
+     * null when WECLAPP_TEST_SALES_ORDER_NUMBER is not set or the order is not found.
+     *
+     * The order is looked up once per PHPUnit process via findByOrderNumber() and
+     * the result is cached. The order should be in an open/active state (not
+     * invoiced or cancelled) so that update dry-run tests can run against it.
+     *
+     * A second benefit: SalesOrderDTO.customerId gives a known-good customer ID
+     * that can be reused for SalesOrder and Quotation create dry-run tests —
+     * more reliable than picking the first customer from a list() call.
+     *
+     * Configure in tests/.env.test:
+     *   WECLAPP_TEST_SALES_ORDER_NUMBER=SO-12345
+     */
+    final protected function testSalesOrder(): ?SalesOrderDTO
+    {
+        if (self::$testSalesOrderResolved) {
+            return self::$testSalesOrderCache;
+        }
+
+        self::$testSalesOrderResolved = true;
         $this->loadEnvFile();
 
-        $id = (string) (getenv('WECLAPP_TEST_CUSTOMER_ID') ?: ($_ENV['WECLAPP_TEST_CUSTOMER_ID'] ?? ''));
+        $number = trim((string) (getenv('WECLAPP_TEST_SALES_ORDER_NUMBER') ?: ($_ENV['WECLAPP_TEST_SALES_ORDER_NUMBER'] ?? '')));
 
-        return $id !== '' ? $id : null;
+        if ($number === '') {
+            return null;
+        }
+
+        try {
+            self::$testSalesOrderCache = $this->client()->salesOrders()->findByOrderNumber($number);
+        } catch (\Throwable) {
+            self::$testSalesOrderCache = null;
+        }
+
+        return self::$testSalesOrderCache;
     }
 
     /**
