@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace miralsoft\weclapp\api\Resource;
 
 use miralsoft\weclapp\api\DTO\SalesOrderDTO;
-use miralsoft\weclapp\api\DTO\SalesOrderItemDTO;
 use miralsoft\weclapp\api\Exception\NotFoundException;
 use miralsoft\weclapp\api\Exception\OptimisticLockException;
 use miralsoft\weclapp\api\Exception\WeclappApiException;
@@ -136,16 +135,15 @@ class SalesOrderResource extends AbstractResource
             );
         }
 
-        $order = $this->find($orderId);
-
-        $items   = array_map(static fn (SalesOrderItemDTO $item): array => $item->toArray(), $order->orderItems);
-        $items[] = $data;
+        // findRaw() returns the complete API response including read-only fields
+        // (statusHistory, shipped, etc.) that weclapp requires in the PUT payload.
+        // Sending only a partial payload causes weclapp to treat absent fields as
+        // "reset to null" and then fail the read-only validation.
+        $raw = $this->findRaw($orderId);
+        $raw['orderItems'][] = $data;
 
         /** @var SalesOrderDTO */
-        return $this->update($orderId, [
-            'version'    => $order->version,
-            'orderItems' => $items,
-        ]);
+        return $this->update($orderId, $raw);
     }
 
     /**
@@ -169,19 +167,18 @@ class SalesOrderResource extends AbstractResource
      */
     public function updateOrderItem(string $orderId, string $itemId, array $data): SalesOrderDTO
     {
-        $order = $this->find($orderId);
-
+        $raw   = $this->findRaw($orderId);
         $found = false;
-        $items = array_map(
-            static function (SalesOrderItemDTO $item) use ($itemId, $data, &$found): array {
-                $itemArray = $item->toArray();
-                if ($item->id === $itemId) {
-                    $found     = true;
-                    $itemArray = array_merge($itemArray, $data);
+
+        $raw['orderItems'] = array_map(
+            static function (array $item) use ($itemId, $data, &$found): array {
+                if (($item['id'] ?? '') === $itemId) {
+                    $found = true;
+                    return array_merge($item, $data);
                 }
-                return $itemArray;
+                return $item;
             },
-            $order->orderItems,
+            $raw['orderItems'] ?? [],
         );
 
         if (!$found) {
@@ -191,10 +188,7 @@ class SalesOrderResource extends AbstractResource
         }
 
         /** @var SalesOrderDTO */
-        return $this->update($orderId, [
-            'version'    => $order->version,
-            'orderItems' => $items,
-        ]);
+        return $this->update($orderId, $raw);
     }
 
     /**
@@ -213,23 +207,21 @@ class SalesOrderResource extends AbstractResource
      */
     public function removeOrderItem(string $orderId, string $itemId): SalesOrderDTO
     {
-        $order = $this->find($orderId);
+        $raw    = $this->findRaw($orderId);
+        $before = count($raw['orderItems'] ?? []);
 
-        $items  = array_map(static fn (SalesOrderItemDTO $item): array => $item->toArray(), $order->orderItems);
-        $before = count($items);
-        $items  = array_values(array_filter($items, static fn (array $i): bool => ($i['id'] ?? null) !== $itemId));
+        $raw['orderItems'] = array_values(
+            array_filter($raw['orderItems'] ?? [], static fn (array $i): bool => ($i['id'] ?? null) !== $itemId)
+        );
 
-        if (count($items) === $before) {
+        if (count($raw['orderItems']) === $before) {
             throw new NotFoundException(
                 sprintf('Order item "%s" not found in sales order "%s".', $itemId, $orderId)
             );
         }
 
         /** @var SalesOrderDTO */
-        return $this->update($orderId, [
-            'version'    => $order->version,
-            'orderItems' => $items,
-        ]);
+        return $this->update($orderId, $raw);
     }
 
     /**

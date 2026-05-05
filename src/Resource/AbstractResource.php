@@ -171,6 +171,33 @@ abstract class AbstractResource
     }
 
     /**
+     * Fetch the raw response array for a single record by its weclapp ID.
+     *
+     * Unlike find(), this skips DTO mapping and returns the full API response
+     * as a plain array. This is required for Read-Modify-Write operations that
+     * must round-trip ALL fields — including read-only system fields such as
+     * `statusHistory` or `shipped` — back through a PUT request.
+     *
+     * weclapp treats absent fields in a PUT payload as "reset to null/default"
+     * and then rejects any attempt to change a read-only field, even to its
+     * current value. Sending the unmodified raw GET response (with only the
+     * intended field changed) avoids this: weclapp sees no change to the
+     * read-only fields and the validation passes.
+     *
+     * @param string $id The weclapp UUID.
+     * @return array<string, mixed>
+     *
+     * @throws \miralsoft\weclapp\api\Exception\NotFoundException If the record does not exist.
+     * @throws WeclappApiException
+     */
+    protected function findRaw(string $id): array
+    {
+        return $this->rateLimiter->execute(
+            fn () => $this->http->get($this->endpoint . '/id/' . $id)
+        );
+    }
+
+    /**
      * Retrieve a paginated list of records.
      *
      * @param QueryBuilder|null $query Filters, sort order and pagination parameters.
