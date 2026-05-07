@@ -7,37 +7,101 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased] — Branch `WeclappAPIv2`
 
+### Fixed — SalesOrderResource Read-Modify-Write methods sent incomplete payload
+
+`addOrderItem()`, `updateOrderItem()` and `removeOrderItem()` were broken in both
+dry-run and production mode. They submitted a partial payload containing only
+`version` and `orderItems`, causing weclapp to reject the PUT with:
+
+> HTTP 400 — property `statusHistory` is read-only
+
+**Root cause:** weclapp treats absent fields in a PUT payload as "reset to null".
+When a null is assigned to a read-only field such as `statusHistory`, `shipped` or
+`currencyConversionDate`, weclapp raises a validation error even though the value
+was not intentionally changed.
+
+**Fix:** All three methods now call the new `AbstractResource::findRaw()` helper to
+obtain the complete, unmodified API response as a plain array, mutate only the
+`orderItems` key, and PUT the full record back. weclapp sees no change to the
+read-only fields and the validation passes.
+
+**New protected method:** `AbstractResource::findRaw(string $id): array` — fetches
+a record as a raw associative array (bypassing DTO hydration), intended exclusively
+for Read-Modify-Write operations that must round-trip all fields.
+
+### Fixed — SalesInvoiceResource::resolveCustomerDisplayName() undefined property access
+
+`resolveCustomerDisplayName()` referenced three properties that do not exist on
+`SalesInvoiceDTO`: `$customerName`, `$partyId`, and `$customerNumber`. At runtime
+these produced PHP notices ("Undefined property") and the fallback chain silently
+returned `'Unknown'` for every invoice.
+
+**Fix:** The method now uses `$invoice->customerId` (the only customer identifier
+present on `SalesInvoiceDTO`) to call `fetchParty()` and delegates display-name
+resolution to `PartyDTO::getDisplayName()`.
+
+### Fixed — WebhookResource::reactivate() now live-verified
+
+The `reactivate()` docblock previously contained:
+
+> ⚠️ The behaviour of PUT with `deactivatedDate: null` has NOT been verified
+> against the live weclapp API.
+
+A new write integration test (`test_reactivate_webhook_clears_deactivated_date`)
+performs a full deactivate → reactivate cycle and confirms the behaviour against
+the live API. The warning has been removed from the method docblock.
+
 ### Added — Write integration tests + dry-run integration tests
 
 **`DryRunIntegrationTest`** (safe against any tenant, no `WECLAPP_ALLOW_WRITES` required):
 Tests the dry-run feature end-to-end against the real weclapp API:
-- `test_dry_run_customer_update_returns_dto_without_id` — PUT with `?dryRun=true`, verifies `id === ''`
-- `test_dry_run_customer_update_reflects_changed_field` — verifies the submitted field value appears in the response
-- `test_dry_run_sales_order_create_with_real_customer_id` — uses a real customerId from the tenant; verifies 200 response
-- `test_dry_run_sales_order_create_throws_on_invalid_customer` — verifies `ValidationException` for bogus customerId
-- `test_dry_run_sales_order_update_returns_dto_without_id`
-- `test_dry_run_add_order_item_validates_against_real_order` — text-only position; GET is real, PUT is dry-run
-- Three `isDryRun()` sanity checks
+- Customer update (round-trip validate) and field-reflection
+- SalesOrder create with valid / invalid customerId
+- `addOrderItem()` via Read-Modify-Write: real GET + dry-run PUT
+- Quotation create + update, Article create + update
+- SalesInvoice update, Supplier create + update, Contact create + update
 
 **`WebhookWriteIntegrationTest`** (opt-in: requires `WECLAPP_ALLOW_WRITES=true`):
-First true write-capable integration tests in the suite. All tests clean up after
-themselves (try/finally) even if assertions fail, keeping the tenant clean.
+Write-capable integration tests. All tests clean up after themselves (try/finally)
+even if assertions fail, keeping the tenant clean.
 
 ```bash
 WECLAPP_ALLOW_WRITES=true php vendor/bin/phpunit --testsuite Write
 ```
 
-- `test_create_webhook_returns_dto_with_id`
-- `test_find_created_webhook_by_id`
-- `test_update_webhook_adds_atupdate_flag` — update + re-fetch to confirm persistence
-- `test_ensure_subscription_creates_if_not_exists`
-- `test_ensure_subscription_is_idempotent_when_unchanged` — version must be unchanged on second call
-- `test_ensure_subscription_merges_flags_additively` — atCreate preserved when atUpdate added
-- `test_delete_webhook_throws_not_found_on_second_call`
-- `test_deactivate_webhook_sets_deactivated_date`
-- `test_find_by_url_returns_created_webhook`
+- Full Create → Update → Delete lifecycle
+- `ensureSubscription()` — idempotency, flag merging
+- `deactivate()` + `reactivate()` full cycle (live-verified)
+- `findByUrl()` on a freshly created webhook
 
-**`phpunit.xml`:** New `Write` testsuite pointing to write-enabled test files.
+**`phpunit.xml`:** Separate `Write` testsuite; credentials loaded from `tests/.env.test`.
+
+**Test fixture anchors** — `IntegrationTestCase` resolves two optional env vars once per
+PHPUnit process and caches the result, giving all integration tests stable, named test data:
+
+```ini
+# tests/.env.test
+WECLAPP_TEST_CUSTOMER_NUMBER=K-10042   # resolved once via findByCustomerNumber()
+WECLAPP_TEST_SALES_ORDER_NUMBER=SO-123 # resolved once via findByOrderNumber()
+```
+
+The `SalesOrderDTO.customerId` of the test order is reused for all create-dry-run tests
+(SalesOrder, Quotation, Contact), eliminating "invalid customerId" failures that occurred
+when fallback code picked an arbitrary first customer from a list.
+
+**Expanded integration test coverage — 12 additional test methods across 5 files:**
+
+| New test | File | What it verifies |
+|---|---|---|
+| `test_find_by_customer_number_returns_same_record` | Customer | Happy path, uses `WECLAPP_TEST_CUSTOMER_NUMBER` anchor |
+| `test_find_by_customer_number_throws_not_found_for_unknown` | Customer | `NotFoundException` on bogus number |
+| `test_find_by_customer_returns_sales_order_dtos` | SalesOrder | Filter by `customerId`; anchor order must appear in result |
+| `test_find_by_status_returns_sales_order_dtos` | SalesOrder | All returned items have the requested status |
+| `test_find_credit_notes_returns_sales_invoice_dtos` | SalesInvoice | Only `CREDIT_NOTE` type returned |
+| `test_resolve_customer_display_name_returns_non_empty_string` | SalesInvoice | Party lookup + `getDisplayName()` |
+| `test_load_from_stubs_returns_contact_dtos` | Contact | Resolves `CustomerDTO.$contacts` stubs to full DTOs |
+| `test_cursor_yields_article_dtos` | Article | Generator paginates lazily; forced page boundary (pageSize 2) |
+| `test_reactivate_webhook_clears_deactivated_date` | WebhookWrite | Full deactivate → reactivate cycle, re-fetch confirms persistence |
 
 ### Added — Dry-run mode (`AbstractResource::withDryRun()`)
 

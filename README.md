@@ -1162,10 +1162,19 @@ cp tests/.env.test.example tests/.env.test
 ```
 
 ```ini
-# tests/.env.test
+# tests/.env.test (required)
 WECLAPP_TENANT=your-tenant   # subdomain of your weclapp URL
 WECLAPP_TOKEN=your-api-token
+
+# Optional: named test data anchors (makes create-dry-run tests more deterministic)
+# WECLAPP_TEST_CUSTOMER_NUMBER=K-10042    # resolved once via findByCustomerNumber()
+# WECLAPP_TEST_SALES_ORDER_NUMBER=SO-123  # resolved once via findByOrderNumber()
 ```
+
+When `WECLAPP_TEST_CUSTOMER_NUMBER` / `WECLAPP_TEST_SALES_ORDER_NUMBER` are set,
+all integration tests that need a customer ID or order ID use these anchors instead
+of falling back to the first entry from a `list()` call — more deterministic and
+independent of list ordering changes.
 
 **Run (read-only + dry-run — safe against any tenant):**
 
@@ -1184,13 +1193,14 @@ php vendor/bin/phpunit   # Unit: OK · Integration: S (skipped)
 
 | Test class | Nature | Checks |
 |---|---|---|
-| `CustomerResourceIntegrationTest` | read-only | list, find by ID, count, `modifiedSince` filter |
-| `SalesInvoiceResourceIntegrationTest` | read-only | list, find by ID, status enum, count |
-| `SalesOrderResourceIntegrationTest` | read-only | list, find by ID, status enum, `findByOrderNumber` |
-| `ArticleResourceIntegrationTest` | read-only | list, find by number, NotFoundException, `findCategoryIdByNumber` |
-| `NumberRangeResourceIntegrationTest` | read-only | at least one range, all types known, proforma prefix |
+| `CustomerResourceIntegrationTest` | read-only | list, find by ID, count, `modifiedSince`, `findByCustomerNumber`, NotFoundException |
+| `SalesOrderResourceIntegrationTest` | read-only | list, find by ID, status enum, `findByOrderNumber`, `findByCustomer`, `findByStatus` |
+| `SalesInvoiceResourceIntegrationTest` | read-only | list, find by ID, status enum, count, `findByInvoiceNumber`, `findCreditNotes`, `resolveCustomerDisplayName` |
+| `ArticleResourceIntegrationTest` | read-only | list, find by number, NotFoundException, `findCategoryIdByNumber`, `cursor()` lazy pagination |
+| `ContactResourceIntegrationTest` | read-only | list, find by ID, count, `loadFromStubs()` |
+| `NumberRangeResourceIntegrationTest` | read-only | at least one range, all types known, proforma prefix, `isCurrentlyActive()` |
 | `WebhookResourceIntegrationTest` | read-only | list, count, required fields, `findByUrl`, `findByEntityName` |
-| `DryRunIntegrationTest` | **dry-run** | real API validates payloads; nothing is persisted |
+| `DryRunIntegrationTest` | **dry-run** | Customer, SalesOrder, Quotation, Article, SalesInvoice, Supplier, Contact — payloads validated; nothing persisted |
 
 ### Write Tests (live API — opt-in only)
 
@@ -1212,7 +1222,7 @@ All write tests clean up after themselves (try/finally) so the tenant remains pr
 
 | Test class | Creates / Deletes |
 |---|---|
-| `WebhookWriteIntegrationTest` | Webhook records — full Create → Update → Delete lifecycle, `ensureSubscription` idempotency, `deactivate`, `findByUrl` after creation |
+| `WebhookWriteIntegrationTest` | Webhook records — full Create → Update → Delete lifecycle, `ensureSubscription` idempotency, `deactivate`, `reactivate` (live-verified), `findByUrl` after creation |
 
 ---
 

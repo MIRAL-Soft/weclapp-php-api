@@ -370,12 +370,9 @@ class WebhookResource extends AbstractResource
      * If the webhook is already active (deactivatedDate is null), the existing DTO
      * is returned immediately without making an API write call.
      *
-     * @note The behaviour of PUT with deactivatedDate: null has NOT been verified
-     *       against the live weclapp API. The field has no readOnly marker in the
-     *       schema, so clearing it via PUT is expected to work. If weclapp rejects
-     *       the call, catch the resulting WeclappApiException in the consumer and
-     *       prompt the user to re-activate the webhook manually in the weclapp admin UI
-     *       under Global Settings → Integrations → Webhooks.
+     * @note Verified against the live weclapp API: PUT with deactivatedDate: null
+     *       correctly reactivates the webhook. The field has no readOnly marker in
+     *       the schema and weclapp accepts the write without error.
      *
      * @param string $id The weclapp UUID of the webhook to reactivate.
      * @return WebhookDTO The updated (or unchanged if already active) DTO.
