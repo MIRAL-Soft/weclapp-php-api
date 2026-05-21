@@ -7,6 +7,50 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased] — Branch `WeclappAPIv2`
 
+### Added — AbstractResource::findRaw() — public raw record backup
+
+`findRaw(string $id): array` was previously `protected`. It is now `public` and
+available on every resource class (typed override added on `ArticleResource`).
+
+**Purpose:** Return the complete, unfiltered weclapp API response as a plain PHP
+array — every field the API provides, including read-only system fields
+(`statusHistory`, `shipped`, `currencyConversionDate`, …) that the DTO does not
+map. The result can be stored as a backup before a write operation and passed
+unmodified to `update()` to restore the record to exactly this state.
+
+```php
+// Step 1 — take a full backup before any write
+$backup = $client->articles()->findRaw($articleId);
+
+// Step 2 — perform your write (patch, addOrderItem, custom update, …)
+$client->articles()->patch($articleId, ['name' => $newName]);
+
+// Step 3 — if something went wrong, restore:
+//   (must merge the current version first to honour optimistic locking)
+$current = $client->articles()->findRaw($articleId);
+$client->articles()->update($articleId, array_merge($backup, ['version' => $current['version']]));
+```
+
+**Optimistic locking caveat:** The `version` field in the snapshot reflects the
+state at backup time. If the record was modified between the backup and the
+restore, weclapp rejects the PUT with HTTP 409 (`OptimisticLockException`).
+Always merge the current `version` into the backup before calling `update()`.
+
+**Note on absent fields:** weclapp omits optional fields whose value is `null`
+or empty from GET responses. The raw array therefore does not always contain
+every key the DTO maps (the DTO fills those absent keys with defaults). This
+does not affect backup/restore correctness: a PUT without an absent field leaves
+that field at its current value, which was already `null`.
+
+**`ArticleWriteIntegrationTest`** — two additional tests:
+
+- `test_find_raw_round_trip_preserves_all_business_fields` — load raw → `update()`
+  unchanged → re-fetch and assert `articleNumber`, `name`, `active`, `articleCategoryId`
+  are all identical (verifies the round-trip is truly lossless for business data)
+- `test_find_raw_contains_all_api_fields` — asserts required fields are present,
+  verifies no data transformation occurs in `findRaw()` (raw values match DTO values
+  for every shared key), and confirms the response is substantially richer than a stub
+
 ### Added — AbstractResource::patch() — safe partial field update (Read-Modify-Write)
 
 All resource classes now expose a `patch()` method for changing individual fields

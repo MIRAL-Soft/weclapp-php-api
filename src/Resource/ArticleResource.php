@@ -100,6 +100,27 @@ class ArticleResource extends AbstractResource
     }
 
     /**
+     * Fetch the complete raw API response for an article as a plain array.
+     *
+     * Returns every field the weclapp API provides — including read-only system
+     * fields not covered by ArticleDTO. The result can be stored as a backup
+     * and passed unmodified to update() to restore the article to this exact state.
+     *
+     * See AbstractResource::findRaw() for the full contract including the
+     * optimistic-locking caveat when using the backup for a restore.
+     *
+     * @param string $id The weclapp UUID of the article.
+     * @return array<string, mixed>
+     *
+     * @throws \miralsoft\weclapp\api\Exception\NotFoundException If the article does not exist.
+     * @throws \miralsoft\weclapp\api\Exception\WeclappApiException
+     */
+    public function findRaw(string $id): array
+    {
+        return parent::findRaw($id);
+    }
+
+    /**
      * {@inheritdoc}
      *
      * @return ArticleDTO

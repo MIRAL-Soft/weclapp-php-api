@@ -378,6 +378,18 @@ foreach ($article->articlePrices as $price) {
     echo $price->getPrice() . ' ' . $price->currencyId . PHP_EOL;
 }
 
+// ── Full raw backup (findRaw) ─────────────────────────────────────────────────
+//
+// findRaw() returns the complete, unfiltered API response as a plain array —
+// every field including read-only system fields not covered by the DTO.
+// Use it to take a snapshot before a write operation.
+
+$backup = $client->articles()->findRaw($article->id);
+
+// Restore after a bad write (merge the current version first):
+$current = $client->articles()->findRaw($article->id);
+$client->articles()->update($article->id, array_merge($backup, ['version' => $current['version']]));
+
 // ── Partial update (patch) ────────────────────────────────────────────────────
 //
 // patch() changes only the fields you supply. All other fields (description,
@@ -1250,7 +1262,7 @@ All write tests clean up after themselves (try/finally) so the tenant remains pr
 | Test class | Creates / Deletes |
 |---|---|
 | `WebhookWriteIntegrationTest` | Webhook records — full Create → Update → Delete lifecycle, `ensureSubscription` idempotency, `deactivate`, `reactivate` (live-verified), `findByUrl` after creation |
-| `ArticleWriteIntegrationTest` | No new records — mutates and restores an existing article. Verifies `patch()` round-trip: only the target field changes, all others survive. Includes dry-run variant. |
+| `ArticleWriteIntegrationTest` | No new records — mutates and restores an existing article. Verifies `patch()` round-trip, `findRaw()` backup/restore round-trip, and dry-run patch. |
 
 ---
 

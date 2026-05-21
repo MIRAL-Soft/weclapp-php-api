@@ -120,6 +120,44 @@ class ArticleResourceTest extends TestCase
     }
 
     // -------------------------------------------------------------------------
+    // findRaw — public raw backup
+    // -------------------------------------------------------------------------
+
+    public function test_find_raw_returns_plain_array(): void
+    {
+        $payload = $this->articlePayload('art-1', 'ART-001');
+        // Simulate extra fields that the DTO does not map (system/read-only)
+        $payload['someSystemField'] = 'system-value';
+
+        $client = $this->makeClient([new Response(200, [], json_encode($payload))]);
+        $raw    = $client->articles()->findRaw('art-1');
+
+        self::assertIsArray($raw);
+        self::assertSame('art-1', $raw['id']);
+        self::assertSame('ART-001', $raw['articleNumber']);
+        // Fields not in the DTO must also be present in the raw response
+        self::assertSame('system-value', $raw['someSystemField']);
+    }
+
+    public function test_find_raw_can_be_passed_to_update_unchanged(): void
+    {
+        // Demonstrates the backup/restore pattern:
+        // findRaw() → (store) → update() — two HTTP calls.
+        $payload = $this->articlePayload('art-1', 'ART-001');
+
+        $client = $this->makeClient([
+            new Response(200, [], json_encode($payload)), // GET (findRaw / backup)
+            new Response(200, [], json_encode($payload)), // PUT (update / restore)
+        ]);
+
+        $raw     = $client->articles()->findRaw('art-1');
+        $updated = $client->articles()->update('art-1', $raw);
+
+        self::assertInstanceOf(ArticleDTO::class, $updated);
+        self::assertSame('ART-001', $updated->articleNumber);
+    }
+
+    // -------------------------------------------------------------------------
     // patch — Read-Modify-Write
     // -------------------------------------------------------------------------
 

@@ -171,26 +171,47 @@ abstract class AbstractResource
     }
 
     /**
-     * Fetch the raw response array for a single record by its weclapp ID.
+     * Fetch the complete raw API response for a single record as a plain array.
      *
-     * Unlike find(), this skips DTO mapping and returns the full API response
-     * as a plain array. This is required for Read-Modify-Write operations that
-     * must round-trip ALL fields — including read-only system fields such as
-     * `statusHistory` or `shipped` — back through a PUT request.
+     * Unlike find(), this skips DTO mapping and returns every field the API
+     * returns — including read-only system fields (e.g. `statusHistory`,
+     * `shipped`, `currencyConversionDate`) that are not mapped by the DTO.
      *
-     * weclapp treats absent fields in a PUT payload as "reset to null/default"
-     * and then rejects any attempt to change a read-only field, even to its
-     * current value. Sending the unmodified raw GET response (with only the
-     * intended field changed) avoids this: weclapp sees no change to the
-     * read-only fields and the validation passes.
+     * **Primary use cases:**
      *
-     * @param string $id The weclapp UUID.
-     * @return array<string, mixed>
+     * 1. **Backup before a write operation** — save the complete record state so
+     *    that any unintended change can be detected or reversed:
+     *    ```php
+     *    $backup = $client->articles()->findRaw($id); // complete snapshot
+     *    $client->articles()->patch($id, ['name' => $newName]);
+     *    // ... if something went wrong, restore:
+     *    $current = $client->articles()->findRaw($id);
+     *    $restore = array_merge($backup, ['version' => $current['version']]);
+     *    $client->articles()->update($id, $restore);
+     *    ```
+     *    ⚠️ **Optimistic locking:** The `version` field in the snapshot reflects
+     *    the state at backup time. If the record was modified between the backup
+     *    and the restore call, weclapp rejects the PUT with HTTP 409
+     *    (`OptimisticLockException`). Always merge the current `version` into
+     *    the backup before calling `update()`, as shown above.
+     *
+     * 2. **Read-Modify-Write** — used internally by `patch()`,
+     *    `SalesOrderResource::addOrderItem()`, `updateOrderItem()`, and
+     *    `removeOrderItem()` to ensure the full payload (including all read-only
+     *    fields) is always sent back, preventing weclapp's "field absent = reset
+     *    to null" behaviour from silently clearing unrelated data.
+     *
+     * The returned array can be passed directly to `update($id, $raw)` and
+     * weclapp will accept it without validation errors, provided the `version`
+     * matches the current record version.
+     *
+     * @param string $id The weclapp UUID of the record to fetch.
+     * @return array<string, mixed> Complete raw API response body.
      *
      * @throws \miralsoft\weclapp\api\Exception\NotFoundException If the record does not exist.
      * @throws WeclappApiException
      */
-    protected function findRaw(string $id): array
+    public function findRaw(string $id): array
     {
         return $this->rateLimiter->execute(
             fn () => $this->http->get($this->endpoint . '/id/' . $id)
