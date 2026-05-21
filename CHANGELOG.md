@@ -7,6 +7,54 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased] — Branch `WeclappAPIv2`
 
+### Added — AbstractResource::patch() — safe partial field update (Read-Modify-Write)
+
+All resource classes now expose a `patch()` method for changing individual fields
+on an existing record without affecting any other field.
+
+**Problem solved:** weclapp's `PUT` endpoint treats absent fields as "reset to
+null/default". A call to `update($id, ['name' => 'New'])` would silently erase
+every other field on the record (description, category, prices, EAN, …). The
+only safe alternative was to fetch the full record first — but this required
+callers to implement the Read-Modify-Write pattern themselves.
+
+**Solution:** `patch()` encapsulates the pattern:
+
+```php
+// Change only the name — all other fields are preserved automatically
+$article = $client->articles()->patch($id, ['name' => 'Corrected Name']);
+
+// Works on any resource that doesn't override it
+$customer = $client->customers()->patch($id, ['company' => 'New GmbH']);
+```
+
+**Behaviour:**
+1. `findRaw($id)` — fetches the complete raw record including all read-only system
+   fields (`statusHistory`, `shipped`, `currencyConversionDate`, …)
+2. Merges `$fields` on top; `id` and `version` from `$fields` are silently stripped
+   (always taken from the live GET to prevent stale-version errors)
+3. `update($id, $merged)` — PUTs the full merged payload back
+
+**Optimistic locking:** If another process modifies the record between the GET and
+the PUT, weclapp returns HTTP 409 → `OptimisticLockException`. The caller must
+re-fetch and retry.
+
+**Dry-run compatible:** The GET is always real; the PUT honours `withDryRun()`.
+
+```php
+// Validate the patch without persisting
+$preview = $client->articles()->withDryRun()->patch($id, ['name' => 'Preview']);
+// $preview->id === '' (not saved), name reflects submitted value
+```
+
+**Typed override on `ArticleResource`:** Returns `ArticleDTO` (not `AbstractDTO`).
+Further resource-specific overrides can be added on demand.
+
+**`ArticleWriteIntegrationTest`** (requires `WECLAPP_ALLOW_WRITES=true`) verifies:
+- Round-trip: load article → patch name → assert other fields unchanged → re-fetch confirms persistence → restore original name
+- Dry-run variant: PUT not persisted, name unchanged on re-fetch
+- Empty `$fields` → `InvalidArgumentException`
+
 ### Fixed — SalesOrderResource Read-Modify-Write methods sent incomplete payload
 
 `addOrderItem()`, `updateOrderItem()` and `removeOrderItem()` were broken in both

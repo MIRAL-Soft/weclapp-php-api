@@ -377,6 +377,33 @@ echo $image?->fileName;
 foreach ($article->articlePrices as $price) {
     echo $price->getPrice() . ' ' . $price->currencyId . PHP_EOL;
 }
+
+// ── Partial update (patch) ────────────────────────────────────────────────────
+//
+// patch() changes only the fields you supply. All other fields (description,
+// category, prices, EAN, custom attributes, …) are preserved automatically
+// via an internal Read-Modify-Write (GET → merge → PUT).
+//
+// Use this instead of update() whenever you only need to touch one or a few
+// fields — update() sends exactly what you provide and weclapp treats absent
+// fields as "reset to null".
+
+// Rename an article without touching anything else
+$renamed = $client->articles()->patch($article->id, [
+    'name' => trim(preg_replace('/\s+/', ' ', $article->name)), // remove excess whitespace
+]);
+
+// Multiple fields in one call
+$client->articles()->patch($article->id, [
+    'name'   => 'Corrected Name',
+    'active' => false,
+]);
+
+// Dry-run: validate the patch without persisting
+$preview = $client->articles()->withDryRun()->patch($article->id, [
+    'name' => 'Preview Name',
+]);
+// $preview->id === '' (not saved), $preview->name reflects the submitted value
 ```
 
 ### Article Categories
@@ -1223,6 +1250,7 @@ All write tests clean up after themselves (try/finally) so the tenant remains pr
 | Test class | Creates / Deletes |
 |---|---|
 | `WebhookWriteIntegrationTest` | Webhook records — full Create → Update → Delete lifecycle, `ensureSubscription` idempotency, `deactivate`, `reactivate` (live-verified), `findByUrl` after creation |
+| `ArticleWriteIntegrationTest` | No new records — mutates and restores an existing article. Verifies `patch()` round-trip: only the target field changes, all others survive. Includes dry-run variant. |
 
 ---
 

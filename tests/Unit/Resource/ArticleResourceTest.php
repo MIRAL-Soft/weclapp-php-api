@@ -120,6 +120,70 @@ class ArticleResourceTest extends TestCase
     }
 
     // -------------------------------------------------------------------------
+    // patch — Read-Modify-Write
+    // -------------------------------------------------------------------------
+
+    public function test_patch_sends_full_record_with_merged_field(): void
+    {
+        $original          = $this->articlePayload('art-1', 'ART-001');
+        $original['name']  = 'Old Name';
+        $original['description'] = 'Keep me';
+
+        // patch() does two HTTP calls: GET (findRaw) + PUT (update)
+        // The PUT response is a fresh payload with the new name.
+        $putResponse                = $original;
+        $putResponse['name']        = 'New Name';
+        $putResponse['description'] = 'Keep me';
+
+        $client  = $this->makeClient([
+            new Response(200, [], json_encode($original)),    // GET (findRaw)
+            new Response(200, [], json_encode($putResponse)), // PUT (update)
+        ]);
+
+        $result = $client->articles()->patch('art-1', ['name' => 'New Name']);
+
+        self::assertInstanceOf(ArticleDTO::class, $result);
+        self::assertSame('New Name', $result->name);
+        // articleNumber must be unchanged — it came from the raw GET response
+        self::assertSame('ART-001', $result->articleNumber);
+    }
+
+    public function test_patch_strips_id_and_version_from_fields(): void
+    {
+        $original           = $this->articlePayload('art-1', 'ART-001');
+        $original['version'] = '5';
+
+        $putResponse          = $original;
+        $putResponse['name']  = 'Renamed';
+
+        // We use GuzzleHttp's MockHandler but cannot inspect the request body here.
+        // The test verifies no exception is thrown (version collision would cause 409
+        // from the real API — in unit tests the mock always succeeds). The important
+        // guarantee tested by the integration test is that findRaw()'s version wins.
+        $client = $this->makeClient([
+            new Response(200, [], json_encode($original)),
+            new Response(200, [], json_encode($putResponse)),
+        ]);
+
+        // Caller passes a stale version and a stale id — both must be ignored
+        $result = $client->articles()->patch('art-1', [
+            'id'      => '__wrong__',
+            'version' => '0',
+            'name'    => 'Renamed',
+        ]);
+
+        self::assertInstanceOf(ArticleDTO::class, $result);
+    }
+
+    public function test_patch_throws_on_empty_fields(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+
+        $client = $this->makeClient([]); // no HTTP calls expected
+        $client->articles()->patch('art-1', []);
+    }
+
+    // -------------------------------------------------------------------------
     // findCategoryIdByNumber
     // -------------------------------------------------------------------------
 

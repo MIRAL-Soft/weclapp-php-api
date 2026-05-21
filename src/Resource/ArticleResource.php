@@ -104,6 +104,17 @@ class ArticleResource extends AbstractResource
      *
      * @return ArticleDTO
      */
+    public function patch(string $id, array $fields): ArticleDTO
+    {
+        /** @var ArticleDTO */
+        return parent::patch($id, $fields);
+    }
+
+    /**
+     * {@inheritdoc}
+     *
+     * @return ArticleDTO
+     */
     public function find(string $id): ArticleDTO
     {
         /** @var ArticleDTO */

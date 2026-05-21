@@ -318,6 +318,73 @@ abstract class AbstractResource
     }
 
     /**
+     * Safely update one or more fields on an existing record (Read-Modify-Write).
+     *
+     * Unlike update(), which sends whatever you provide and lets weclapp treat
+     * absent fields as "reset to null/default", patch() first fetches the
+     * complete raw record from the API — including all read-only system fields
+     * such as `statusHistory`, `shipped`, `currencyConversionDate`, etc. — then
+     * merges your changes on top and submits the full record back via PUT.
+     *
+     * This means **all** existing field values are preserved; only the keys you
+     * explicitly provide in `$fields` are changed.
+     *
+     * **Optimistic locking** is handled automatically: the `version` obtained
+     * from the GET response is always used. If another process modifies the
+     * record between the GET and the PUT, weclapp returns HTTP 409 and an
+     * `OptimisticLockException` is thrown — the caller must re-fetch and retry.
+     *
+     * `id` and `version` in `$fields` are silently stripped: they are always
+     * taken from the live GET response to prevent accidental locking violations.
+     *
+     * **Dry-run compatible** — works transparently with `withDryRun()`: the GET
+     * is always real (to obtain the current state), the PUT is sent with
+     * `?dryRun=true` (validated but not persisted).
+     *
+     * @param string               $id     The weclapp UUID of the record to update.
+     * @param array<string, mixed> $fields The fields to change. At least one required.
+     * @return T
+     *
+     * @throws \InvalidArgumentException  If $fields is empty.
+     * @throws \miralsoft\weclapp\api\Exception\NotFoundException   If the record does not exist.
+     * @throws \miralsoft\weclapp\api\Exception\OptimisticLockException If concurrently modified.
+     * @throws WeclappApiException
+     *
+     * @example Change only the name of an article
+     * ```php
+     * $article = $client->articles()->patch($id, ['name' => 'Corrected Name']);
+     * ```
+     *
+     * @example Rename a customer without losing any other field
+     * ```php
+     * $customer = $client->customers()->patch($id, ['company' => 'New GmbH']);
+     * ```
+     *
+     * @example Dry-run: validate the patch without persisting
+     * ```php
+     * $preview = $client->articles()->withDryRun()->patch($id, ['name' => 'Preview Name']);
+     * // $preview->id === '' (not saved), but all computed fields are populated
+     * ```
+     */
+    public function patch(string $id, array $fields): AbstractDTO
+    {
+        if (empty($fields)) {
+            throw new \InvalidArgumentException(
+                'patch() requires at least one field to update. Pass a non-empty $fields array.'
+            );
+        }
+
+        $raw = $this->findRaw($id);
+
+        // id and version must always come from the GET response to honour
+        // optimistic locking. Strip them from $fields so the caller cannot
+        // accidentally supply a stale version and bypass the concurrency check.
+        unset($fields['id'], $fields['version']);
+
+        return $this->update($id, array_merge($raw, $fields));
+    }
+
+    /**
      * Delete a record by its weclapp ID.
      *
      * @param string $id The weclapp UUID of the record to delete.
