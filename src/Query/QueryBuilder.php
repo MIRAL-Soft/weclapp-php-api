@@ -301,12 +301,23 @@ class QueryBuilder
     /**
      * Convert a DateTimeInterface or epoch-millisecond integer to epoch milliseconds.
      *
+     * For DateTimeInterface objects the millisecond component is preserved:
+     *   - `format('U')` returns the whole seconds as a string (exact integer, no float)
+     *   - `format('v')` returns the milliseconds 000–999 (PHP 7.1+)
+     *
+     * This is important for ms-precise delta-sync watermarks: passing the weclapp
+     * `lastModifiedDate` value (+1 ms) as a `DateTimeImmutable` must round-trip
+     * without loss, otherwise the last processed record re-appears in the next scan.
+     *
+     * `getTimestamp() * 1000` was intentionally avoided: `getTimestamp()` always
+     * truncates to whole seconds, silently discarding any sub-second component.
+     *
      * @param DateTimeInterface|int $value
      */
     private function toEpochMs(DateTimeInterface|int $value): int
     {
         if ($value instanceof DateTimeInterface) {
-            return $value->getTimestamp() * 1000;
+            return (int) $value->format('U') * 1000 + (int) $value->format('v');
         }
 
         return $value;

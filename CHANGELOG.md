@@ -7,6 +7,50 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased] — Branch `WeclappAPIv2`
 
+### Fixed — QueryBuilder::toEpochMs() millisecond-precision loss
+
+`modifiedSince()` and `createdSince()` accept a `DateTimeInterface` value. The
+previous implementation converted it to epoch milliseconds via
+`getTimestamp() * 1000`, which silently discards any sub-second component:
+
+```php
+// BEFORE (buggy) — 74 ms silently lost:
+$value->getTimestamp() * 1000;  // 1779799373000 instead of 1779799373074
+```
+
+The bug caused delta-sync watermarks to be rounded down to the nearest whole
+second. The last record processed in the previous run had `lastModifiedDate =
+1779799373074` ms; the next run fetched with `lastModifiedDate-gt=1779799373000`,
+causing that record to re-appear and be double-processed.
+
+**Fix:** Replace `getTimestamp()` with millisecond-precise arithmetic:
+
+```php
+// AFTER — no sub-second loss:
+(int) $value->format('U') * 1000 + (int) $value->format('v');
+//   format('U') → Unix epoch in whole seconds (exact integer string, no float)
+//   format('v') → milliseconds component 000–999 (PHP 7.1+)
+```
+
+`getTimestamp() * 1000` was intentionally avoided in the fix because
+`getTimestamp()` always returns whole seconds, whereas `format('U')` returns the
+same integer but as a string — the explicit `(int)` cast guarantees integer
+multiplication with no float-precision risk.
+
+**Round-trip acceptance test:**
+
+```php
+$ms = 1779799373074;
+$dt = DateTimeImmutable::createFromFormat('U.u', sprintf('%d.%03d', intdiv($ms, 1000), $ms % 1000));
+// toEpochMs($dt) === 1779799373074  ✓  (74 ms preserved)
+```
+
+**New / updated unit tests** (`QueryBuilderTest`):
+- `test_modified_since_with_datetime` — updated formula to match canonical implementation
+- `test_modified_since_preserves_sub_second_precision` — exact round-trip with `$ms = 1779799373074`
+- `test_created_since_with_sub_second_datetime` — verifies `createdSince()` code path
+- `test_modified_since_with_epoch_ms_preserves_milliseconds` — integer pass-through
+
 ### Added — AbstractResource::findRaw() — public raw record backup
 
 `findRaw(string $id): array` was previously `protected`. It is now `public` and

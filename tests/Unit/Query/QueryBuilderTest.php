@@ -7,6 +7,7 @@ namespace miralsoft\weclapp\api\Tests\Unit\Query;
 use miralsoft\weclapp\api\Query\FilterOperator;
 use miralsoft\weclapp\api\Query\QueryBuilder;
 use DateTime;
+use DateTimeImmutable;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -54,16 +55,60 @@ class QueryBuilderTest extends TestCase
         $dt    = new DateTime('2024-01-01 00:00:00');
         $query = QueryBuilder::new()->modifiedSince($dt)->build();
 
-        $expectedMs = $dt->getTimestamp() * 1000;
+        // For whole-second DateTimes the ms component is 0; use the canonical formula.
+        $expectedMs = (int) $dt->format('U') * 1000 + (int) $dt->format('v');
         self::assertStringContainsString('lastModifiedDate-gt=' . $expectedMs, $query);
     }
 
-    public function test_modified_since_with_epoch_ms(): void
+    /**
+     * Core round-trip test: a millisecond-precise epoch value must survive the
+     * DateTimeImmutable → toEpochMs() → query string round-trip without loss.
+     *
+     * Acceptance criterion from consumer ticket:
+     *   $ms = 1779799373074;
+     *   $dt = DateTimeImmutable::createFromFormat('U.u', sprintf('%d.%03d', intdiv($ms,1000), $ms%1000));
+     *   assert(toEpochMs($dt) === $ms);
+     */
+    public function test_modified_since_preserves_sub_second_precision(): void
     {
-        $epochMs = 1711400000000;
-        $query   = QueryBuilder::new()->modifiedSince($epochMs)->build();
+        $ms = 1779799373074;
+        $dt = DateTimeImmutable::createFromFormat(
+            'U.u',
+            sprintf('%d.%03d', intdiv($ms, 1000), $ms % 1000)
+        );
 
-        self::assertStringContainsString('lastModifiedDate-gt=' . $epochMs, $query);
+        $query = QueryBuilder::new()->modifiedSince($dt)->build();
+
+        self::assertStringContainsString('lastModifiedDate-gt=' . $ms, $query);
+    }
+
+    /**
+     * Verify that createdSince() also honours sub-second precision (same code path,
+     * different field name — explicit test keeps coverage orthogonal).
+     */
+    public function test_created_since_with_sub_second_datetime(): void
+    {
+        $ms = 1711400000512; // 512 ms
+        $dt = DateTimeImmutable::createFromFormat(
+            'U.u',
+            sprintf('%d.%03d', intdiv($ms, 1000), $ms % 1000)
+        );
+
+        $query = QueryBuilder::new()->createdSince($dt)->build();
+
+        self::assertStringContainsString('createdDate-gt=' . $ms, $query);
+    }
+
+    /**
+     * An integer epoch value (already in ms) must pass through toEpochMs() unchanged
+     * regardless of whether it has a non-zero millisecond component.
+     */
+    public function test_modified_since_with_epoch_ms_preserves_milliseconds(): void
+    {
+        $ms    = 1779799373074;
+        $query = QueryBuilder::new()->modifiedSince($ms)->build();
+
+        self::assertStringContainsString('lastModifiedDate-gt=' . $ms, $query);
     }
 
     public function test_builds_sort_asc(): void

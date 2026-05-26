@@ -263,6 +263,24 @@ $changed = $client->customers()->findModifiedSince(
 > All DTOs expose `lastModifiedDate` (epoch ms), `getLastModifiedAt()` (DateTimeImmutable),
 > `createdDate` and `getCreatedAt()` for this purpose.
 
+> **Millisecond-precision watermarks:** `modifiedSince()` and `createdSince()` accept
+> either a raw epoch-ms integer **or** a `DateTimeInterface` object. When a `DateTime`/
+> `DateTimeImmutable` is passed, the conversion to epoch ms preserves the sub-second
+> component (milliseconds). This matters for reliable delta sync: weclapp timestamps
+> include ms precision, and a watermark rounded down to whole seconds will re-fetch
+> the last record on every run.
+>
+> ```php
+> // Safe: integer epoch ms round-trips exactly
+> $lastSyncMs = max($lastSyncMs, $customer->lastModifiedDate + 1);
+> $changed = $client->customers()->findModifiedSince($lastSyncMs);
+>
+> // Also safe: DateTimeImmutable with ms precision
+> $dt = DateTimeImmutable::createFromFormat('U.u',
+>     sprintf('%d.%03d', intdiv($lastSyncMs, 1000), $lastSyncMs % 1000));
+> $changed = $client->customers()->findModifiedSince($dt); // exact ms preserved
+> ```
+
 ---
 
 ## Entity-Specific Features
