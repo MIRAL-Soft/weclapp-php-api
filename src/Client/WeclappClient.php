@@ -14,6 +14,7 @@ use miralsoft\weclapp\api\Resource\DocumentResource;
 use miralsoft\weclapp\api\Resource\NumberRangeResource;
 use miralsoft\weclapp\api\Resource\NumberRangeValueResource;
 use miralsoft\weclapp\api\Resource\PartyResource;
+use miralsoft\weclapp\api\Resource\QuantityUnitResource;
 use miralsoft\weclapp\api\Resource\PurchaseOrderResource;
 use miralsoft\weclapp\api\Resource\QuotationResource;
 use miralsoft\weclapp\api\Resource\SalesInvoiceResource;
@@ -325,5 +326,34 @@ final class WeclappClient
     public function numberRangeValues(): NumberRangeValueResource
     {
         return new NumberRangeValueResource($this->http, $this->rateLimiter, $this->cache);
+    }
+
+    /**
+     * Returns the Quantity Unit resource for reading and managing units of measure.
+     *
+     * Units define the unit of measure used on order and invoice line items
+     * (e.g. "h" for Stunde, "Stk." for Stück, "Lizenz"). Time-based units
+     * additionally carry a timeUnitAmount (in seconds) which can be used to
+     * convert tracked time into a billable quantity for time-sync workflows.
+     *
+     * Endpoint: /api/v2/unit
+     *
+     * @example Populate a time-unit dropdown for a setup UI:
+     * $units = $client->quantityUnits()->findTimeUnits();
+     * foreach ($units as $unit) {
+     *     // $unit->name           → "h"
+     *     // $unit->description    → "Stunde"
+     *     // $unit->timeUnitAmount → 3600  (seconds)
+     *     // $unit->getMilliseconds() → 3_600_000
+     * }
+     *
+     * @example Check availability (used by Docbee Exporter as fail-soft guard):
+     * if (method_exists($client, 'quantityUnits')) {
+     *     $units = $client->quantityUnits()->findTimeUnits();
+     * }
+     */
+    public function quantityUnits(): QuantityUnitResource
+    {
+        return new QuantityUnitResource($this->http, $this->rateLimiter, $this->cache);
     }
 }

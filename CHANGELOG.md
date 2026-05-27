@@ -7,6 +7,75 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased] — Branch `WeclappAPIv2`
 
+### Added — QuantityUnitResource (`/api/v2/unit`)
+
+New resource for reading and managing weclapp units of measure (Mengeneinheiten).
+Primary use case: populating a setup-UI dropdown with time-based units for
+time-tracking sync workflows (e.g. Docbee Exporter Zeit-Sync).
+
+**New files:**
+- `src/DTO/QuantityUnitDTO.php` — 7 fields: `id`, `version`, `createdDate`,
+  `lastModifiedDate`, `name`, `description`, `timeUnitAmount`
+- `src/Resource/QuantityUnitResource.php` — wraps `/api/v2/unit`
+- `tests/Unit/Resource/QuantityUnitResourceTest.php` — 15 tests
+
+**Client method:** `$client->quantityUnits(): QuantityUnitResource`
+
+**Key finding — `timeUnitAmount` is in seconds (verified against live API):**
+
+```
+Stunde (h)  → timeUnitAmount = 3600   (= 3600 s = 1 h)
+Stk., Kg, Lizenz, Gerät, … → timeUnitAmount absent (null)
+Jahr, Monat → timeUnitAmount absent   (despite being time-related)
+```
+
+The unit is **seconds**, not milliseconds. Use `getMilliseconds()` to obtain
+the value in ms directly (e.g. for a `msPerUnit` setup field):
+
+```php
+$unit->timeUnitAmount  // 3600  (s)
+$unit->getMilliseconds() // 3_600_000  (ms)
+```
+
+**`QuantityUnitDTO` helpers:**
+
+| Method | Description |
+|---|---|
+| `isTimeUnit(): bool` | `true` when `timeUnitAmount !== null` — filters out Stück, Pauschal, Lizenz, Jahr, Monat, … |
+| `getMilliseconds(): ?int` | `timeUnitAmount × 1000`; null for non-time units |
+| `getCreatedAt(): ?DateTimeImmutable` | epoch-ms → DateTimeImmutable |
+| `getLastModifiedAt(): ?DateTimeImmutable` | epoch-ms → DateTimeImmutable |
+
+**`QuantityUnitResource` methods:**
+
+| Method | Description |
+|---|---|
+| `find(string $id): QuantityUnitDTO` | Fetch a single unit by ID |
+| `listAll(?QueryBuilder): list<QuantityUnitDTO>` | All units (cacheable) |
+| `findByName(string $name): QuantityUnitDTO` | Exact name match; throws `NotFoundException` |
+| `findTimeUnits(): list<QuantityUnitDTO>` | Only units where `isTimeUnit() === true` |
+| `create(array): QuantityUnitDTO` | Create a new unit |
+| `update(string, array): QuantityUnitDTO` | Update an existing unit |
+| `delete(string): void` | Delete a unit |
+
+**Usage example (Docbee Exporter setup dropdown):**
+
+```php
+$timeUnits = $client->quantityUnits()->findTimeUnits();
+foreach ($timeUnits as $unit) {
+    echo "{$unit->description} ({$unit->name}) = {$unit->getMilliseconds()} ms\n";
+    // "Stunde (h) = 3600000 ms"
+}
+```
+
+**Docbee fail-soft guard** (`method_exists` check works automatically):
+
+```php
+if (method_exists($client, 'quantityUnits')) {
+    $units = $client->quantityUnits()->findTimeUnits();
+}
+```
+
 ### Fixed — QueryBuilder::toEpochMs() millisecond-precision loss
 
 `modifiedSince()` and `createdSince()` accept a `DateTimeInterface` value. The

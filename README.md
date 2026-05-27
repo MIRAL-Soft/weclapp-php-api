@@ -657,6 +657,66 @@ if ($doc !== null) {
 | `documentType` | Document attachment | `SALES_INVOICE_CANCELLATION` |
 | `name` | Document attachment | Filename including CLX-number (weclapp-generated) |
 
+### Quantity Units
+
+Quantity units (Mengeneinheiten) define the unit of measure used on order and
+invoice line items (e.g. `h` for Stunde, `Stk.` for Stück, `Lizenz`).
+Time-based units additionally carry a `timeUnitAmount` (in **seconds**) which
+enables automated time-tracking sync workflows.
+
+```php
+$units = $client->quantityUnits();
+
+// All units — useful for generic dropdowns
+$all = $units->listAll();
+
+// Only time-based units (those with a timeUnitAmount) — ideal for setup-UI dropdowns
+// that power time-tracking reverse-sync (Docbee → Weclapp)
+$timeUnits = $units->findTimeUnits();
+foreach ($timeUnits as $unit) {
+    echo $unit->description;          // "Stunde"
+    echo $unit->name;                 // "h"
+    echo $unit->timeUnitAmount;       // 3600  ← seconds (verified against live API)
+    echo $unit->getMilliseconds();    // 3_600_000  ← ms, ready for msPerUnit config
+    echo $unit->isTimeUnit();         // true
+}
+
+// Look up a specific unit by name
+$hour = $units->findByName('h');
+echo $hour->timeUnitAmount; // 3600
+
+// Find by ID
+$unit = $units->find('2221');
+```
+
+> **`timeUnitAmount` unit is seconds, not milliseconds** — verified against the
+> live weclapp API: `Stunde` returns `3600` (not `3600000`). Use
+> `getMilliseconds()` or multiply by 1000 for `msPerUnit` config fields.
+
+> **Jahr / Monat do not have `timeUnitAmount`** — even though they are
+> time-related, weclapp does not set this field for them. `findTimeUnits()`
+> therefore excludes them. This is intentional: monthly/yearly billing cycles
+> are not compatible with automated per-minute time rounding.
+
+> **Fail-soft guard** (for consumers that check library version at runtime):
+> ```php
+> if (method_exists($client, 'quantityUnits')) {
+>     $timeUnits = $client->quantityUnits()->findTimeUnits();
+> }
+> ```
+
+**Available fields on `QuantityUnitDTO`:**
+
+| Field | Type | Description |
+|---|---|---|
+| `id` | `string` | weclapp UUID |
+| `version` | `string` | Optimistic locking version |
+| `createdDate` | `int` | Creation timestamp (epoch ms) |
+| `lastModifiedDate` | `int` | Last modification timestamp (epoch ms) |
+| `name` | `string` | Short symbol, e.g. `h`, `Stk.`, `Lizenz` |
+| `description` | `?string` | Long name, e.g. `Stunde`, `Stück` (max 60 chars) |
+| `timeUnitAmount` | `?int` | Duration in **seconds**; `null` for non-time units |
+
 ### Number Ranges & Proforma Invoice Detection
 
 weclapp assigns every document type its own number series (e.g. `RE-` for invoices, `CLX-` for
@@ -1256,6 +1316,7 @@ php vendor/bin/phpunit   # Unit: OK · Integration: S (skipped)
 | `ArticleResourceIntegrationTest` | read-only | list, find by number, NotFoundException, `findCategoryIdByNumber`, `cursor()` lazy pagination |
 | `ContactResourceIntegrationTest` | read-only | list, find by ID, count, `loadFromStubs()` |
 | `NumberRangeResourceIntegrationTest` | read-only | at least one range, all types known, proforma prefix, `isCurrentlyActive()` |
+| `QuantityUnitResourceTest` | **unit test** | DTO hydration, `isTimeUnit()`, `getMilliseconds()`, `findTimeUnits()` filtering, `findByName()`, CRUD, fail-soft guard |
 | `WebhookResourceIntegrationTest` | read-only | list, count, required fields, `findByUrl`, `findByEntityName` |
 | `DryRunIntegrationTest` | **dry-run** | Customer, SalesOrder, Quotation, Article, SalesInvoice, Supplier, Contact — payloads validated; nothing persisted |
 
