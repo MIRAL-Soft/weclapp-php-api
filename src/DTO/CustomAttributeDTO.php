@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace miralsoft\weclapp\api\DTO;
 
 use DateTimeImmutable;
+use DateTimeInterface;
 
 /**
  * Represents a custom attribute value attached to a weclapp entity.
@@ -68,5 +69,99 @@ final class CustomAttributeDTO extends AbstractDTO
     public function getDateValue(): ?DateTimeImmutable
     {
         return self::dateFromEpochMs(['dateValue' => $this->dateValue], 'dateValue');
+    }
+
+    /**
+     * Returns the populated value as a best-effort scalar, regardless of type.
+     *
+     * Inspects the value fields in priority order and returns the first one that
+     * is set: stringValue → numberValue → dateValue → selectedValueId, falling
+     * back to booleanValue.
+     *
+     * **Caveat:** a CustomAttributeDTO does not carry its own definition type, so
+     * for ambiguous cases prefer the typed property directly (e.g. `->stringValue`).
+     * For LIST/MULTISELECT/ENTITY attributes use `selectedValueId`/`selectedValues`/
+     * `entityReferences` explicitly.
+     */
+    public function value(): string|int|bool|null
+    {
+        return match (true) {
+            $this->stringValue     !== null => $this->stringValue,
+            $this->numberValue     !== null => $this->numberValue,
+            $this->dateValue       !== null => $this->dateValue,
+            $this->selectedValueId !== null => $this->selectedValueId,
+            default                         => $this->booleanValue,
+        };
+    }
+
+    // -------------------------------------------------------------------------
+    // Payload builders — produce the raw fragment for a customAttributes entry
+    // -------------------------------------------------------------------------
+
+    /**
+     * Build a STRING/URL/LARGE_TEXT custom attribute payload fragment.
+     *
+     * @return array<string, mixed>
+     *
+     * @example
+     * $client->salesOrders()->setCustomAttribute(
+     *     $orderId,
+     *     CustomAttributeDTO::string($defId, 'TICKET-4711')
+     * );
+     */
+    public static function string(string $definitionId, ?string $value): array
+    {
+        return ['attributeDefinitionId' => $definitionId, 'stringValue' => $value];
+    }
+
+    /**
+     * Build an INTEGER/DECIMAL custom attribute payload fragment.
+     *
+     * weclapp stores numbers as decimal strings; ints/floats are cast to string.
+     *
+     * @param int|float|string|null $value
+     * @return array<string, mixed>
+     */
+    public static function number(string $definitionId, int|float|string|null $value): array
+    {
+        return [
+            'attributeDefinitionId' => $definitionId,
+            'numberValue'           => $value === null ? null : (string) $value,
+        ];
+    }
+
+    /**
+     * Build a BOOLEAN custom attribute payload fragment.
+     *
+     * @return array<string, mixed>
+     */
+    public static function boolean(string $definitionId, bool $value): array
+    {
+        return ['attributeDefinitionId' => $definitionId, 'booleanValue' => $value];
+    }
+
+    /**
+     * Build a DATE custom attribute payload fragment.
+     *
+     * @param DateTimeInterface|int|null $value DateTime or epoch milliseconds.
+     * @return array<string, mixed>
+     */
+    public static function date(string $definitionId, DateTimeInterface|int|null $value): array
+    {
+        $epochMs = $value instanceof DateTimeInterface
+            ? (int) $value->format('U') * 1000 + (int) $value->format('v')
+            : $value;
+
+        return ['attributeDefinitionId' => $definitionId, 'dateValue' => $epochMs];
+    }
+
+    /**
+     * Build a LIST (single-select) custom attribute payload fragment.
+     *
+     * @return array<string, mixed>
+     */
+    public static function selection(string $definitionId, ?string $selectedValueId): array
+    {
+        return ['attributeDefinitionId' => $definitionId, 'selectedValueId' => $selectedValueId];
     }
 }

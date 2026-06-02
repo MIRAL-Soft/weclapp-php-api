@@ -717,6 +717,81 @@ $unit = $units->find('2221');
 | `description` | `?string` | Long name, e.g. `Stunde`, `Stück` (max 60 chars) |
 | `timeUnitAmount` | `?int` | Duration in **seconds**; `null` for non-time units |
 
+### Custom Attributes (user-defined fields)
+
+weclapp lets you define custom fields ("benutzerdefinierte Felder") per entity type.
+The library manages both the **definitions** (the field schema) and the **values**
+on each entity instance.
+
+```php
+use miralsoft\weclapp\api\DTO\CustomAttributeDTO;
+use miralsoft\weclapp\api\Enum\CustomAttributeEntityType;
+use miralsoft\weclapp\api\Enum\CustomAttributeType;
+
+// ── 1. Ensure a definition exists (idempotent) ───────────────────────────────
+$def = $client->customAttributeDefinitions()->ensure(
+    CustomAttributeEntityType::SalesOrder,
+    'docbeeTicketId',         // stable attributeKey (your handle)
+    'Docbee Ticket ID',       // human-readable label
+    CustomAttributeType::String,
+);
+// Second call returns the SAME definition — never duplicates.
+$definitionId = $def->id;
+
+// Build a setup-UI dropdown of all custom fields on an entity:
+$fields = $client->customAttributeDefinitions()->findByEntity(CustomAttributeEntityType::SalesOrder);
+
+// ── 2a. Write a value ATOMICALLY when creating the entity ─────────────────────
+$order = $client->salesOrders()->create([
+    'customerId'       => $customerId,
+    'customAttributes' => [CustomAttributeDTO::string($definitionId, 'TICKET-4711')],
+]);
+
+// ── 2b. Or set it on an existing entity (preserves all other fields) ──────────
+$client->salesOrders()->setCustomAttribute(
+    $orderId,
+    CustomAttributeDTO::string($definitionId, 'TICKET-4711'),
+);
+
+// ── 3. Read a value ──────────────────────────────────────────────────────────
+$order  = $client->salesOrders()->find($orderId);
+$ticket = $order->getCustomAttribute($definitionId)?->stringValue; // typed (recommended)
+$value  = $order->getCustomAttributeValue($definitionId);          // best-effort scalar
+```
+
+**Typed payload builders** on `CustomAttributeDTO` (the library picks the correct
+value field per type — you never assemble raw payloads):
+
+| Builder | For attribute type |
+|---|---|
+| `CustomAttributeDTO::string($defId, $value)` | STRING, URL, LARGE_TEXT |
+| `CustomAttributeDTO::number($defId, $value)` | INTEGER, DECIMAL |
+| `CustomAttributeDTO::boolean($defId, $value)` | BOOLEAN |
+| `CustomAttributeDTO::date($defId, $value)` | DATE (DateTime or epoch ms, ms-precise) |
+| `CustomAttributeDTO::selection($defId, $valueId)` | LIST (single-select) |
+
+`setCustomAttribute()` is on `AbstractResource`, so it works for **every** entity
+(salesOrder, article, customer, …). It uses the same safe Read-Modify-Write strategy
+as `patch()`: the full record is round-tripped, so no other field is cleared, and
+optimistic locking + dry-run are handled automatically.
+
+`getCustomAttribute()` / `getCustomAttributeValue()` work on any entity DTO that
+maps `customAttributes` and return `null` when the attribute (or the property) is absent.
+
+> **Definition management notes (live-verified):**
+> - Entity scope is set via the `entities` array (`["salesOrder"]`), **not** an
+>   `attributeEntityType` field — `ensure()` handles this for you.
+> - `entities` is not server-side filterable, so `findByEntity()` / `findByKey()`
+>   filter the entity scope client-side.
+> - `attributeKey` is freely choosable and is the stable idempotency handle.
+> - `customAttributes` are returned in both `find()` and list responses by default —
+>   no field-selector needed.
+
+> **`getCustomAttributeValue()` caveat:** a value object does not carry its own type,
+> so the convenience reader returns the first populated field
+> (string → number → date → selectedValueId → boolean). For known-type fields prefer
+> the typed property, e.g. `getCustomAttribute($id)?->stringValue`.
+
 ### Number Ranges & Proforma Invoice Detection
 
 weclapp assigns every document type its own number series (e.g. `RE-` for invoices, `CLX-` for
@@ -1317,6 +1392,9 @@ php vendor/bin/phpunit   # Unit: OK · Integration: S (skipped)
 | `ContactResourceIntegrationTest` | read-only | list, find by ID, count, `loadFromStubs()` |
 | `NumberRangeResourceIntegrationTest` | read-only | at least one range, all types known, proforma prefix, `isCurrentlyActive()` |
 | `QuantityUnitResourceTest` | **unit test** | DTO hydration, `isTimeUnit()`, `getMilliseconds()`, `findTimeUnits()` filtering, `findByName()`, CRUD, fail-soft guard |
+| `CustomAttributeDefinitionResourceTest` | **unit test** | DTO hydration, `appliesTo()`, `findByEntity()`/`findByKey()` client-side filter, `ensure()` idempotency (reuse + create) |
+| `CustomAttributeDTOTest` | **unit test** | `value()` reader, payload builders (`string`/`number`/`boolean`/`date` ms-precise/`selection`) |
+| `CustomAttributeValueIntegrationTest` | **unit test** | `setCustomAttribute()` Read-Modify-Write (append/replace), DTO `getCustomAttribute()`/`getCustomAttributeValue()` |
 | `WebhookResourceIntegrationTest` | read-only | list, count, required fields, `findByUrl`, `findByEntityName` |
 | `DryRunIntegrationTest` | **dry-run** | Customer, SalesOrder, Quotation, Article, SalesInvoice, Supplier, Contact — payloads validated; nothing persisted |
 

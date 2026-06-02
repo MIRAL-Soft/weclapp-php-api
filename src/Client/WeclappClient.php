@@ -9,6 +9,7 @@ use miralsoft\weclapp\api\Config\WeclappConfig;
 use miralsoft\weclapp\api\Resource\ArticleCategoryResource;
 use miralsoft\weclapp\api\Resource\ArticleResource;
 use miralsoft\weclapp\api\Resource\ContactResource;
+use miralsoft\weclapp\api\Resource\CustomAttributeDefinitionResource;
 use miralsoft\weclapp\api\Resource\CustomerResource;
 use miralsoft\weclapp\api\Resource\DocumentResource;
 use miralsoft\weclapp\api\Resource\NumberRangeResource;
@@ -355,5 +356,44 @@ final class WeclappClient
     public function quantityUnits(): QuantityUnitResource
     {
         return new QuantityUnitResource($this->http, $this->rateLimiter, $this->cache);
+    }
+
+    /**
+     * Returns the Custom Attribute Definition resource for managing user-defined fields.
+     *
+     * Custom attribute definitions describe user-defined fields (the "schema":
+     * key, label, type, applicable entities). The concrete values live on each
+     * entity instance as `customAttributes` and are read via the entity DTO
+     * (`getCustomAttribute()` / `getCustomAttributeValue()`) or written via the
+     * entity resource (`setCustomAttribute()` / `create([... 'customAttributes' => ...])`).
+     *
+     * Endpoint: /api/v2/customAttributeDefinition
+     *
+     * @example Ensure a field exists (idempotent), then set and read a value:
+     * ```php
+     * use miralsoft\weclapp\api\DTO\CustomAttributeDTO;
+     * use miralsoft\weclapp\api\Enum\CustomAttributeEntityType;
+     * use miralsoft\weclapp\api\Enum\CustomAttributeType;
+     *
+     * $def = $client->customAttributeDefinitions()->ensure(
+     *     CustomAttributeEntityType::SalesOrder,
+     *     'docbeeTicketId',
+     *     'Docbee Ticket ID',
+     *     CustomAttributeType::String,
+     * );
+     *
+     * // Atomic create with value
+     * $order = $client->salesOrders()->create([
+     *     'customerId'       => $customerId,
+     *     'customAttributes' => [CustomAttributeDTO::string($def->id, 'TICKET-4711')],
+     * ]);
+     *
+     * // Read it back
+     * $ticketId = $order->getCustomAttributeValue($def->id); // "TICKET-4711"
+     * ```
+     */
+    public function customAttributeDefinitions(): CustomAttributeDefinitionResource
+    {
+        return new CustomAttributeDefinitionResource($this->http, $this->rateLimiter, $this->cache);
     }
 }

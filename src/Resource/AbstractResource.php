@@ -406,6 +406,77 @@ abstract class AbstractResource
     }
 
     /**
+     * Set (or replace) a single custom attribute value on an existing record.
+     *
+     * Uses the same safe Read-Modify-Write strategy as patch(): the complete raw
+     * record is fetched first, the matching `customAttributes` entry (identified
+     * by `attributeDefinitionId`) is replaced — or appended if not yet present —
+     * and the full record is submitted back via PUT. All other fields, including
+     * read-only system fields and other custom attributes, are preserved.
+     *
+     * Build the `$customAttribute` fragment with the typed factories on
+     * {@see \miralsoft\weclapp\api\DTO\CustomAttributeDTO}:
+     * `string()`, `number()`, `boolean()`, `date()`, `selection()`.
+     *
+     * **Optimistic locking** and **dry-run** behave exactly as in patch():
+     * the GET is always real, the PUT honours `withDryRun()`, and the `version`
+     * is always taken from the live GET.
+     *
+     * @param string               $id              The weclapp UUID of the record.
+     * @param array<string, mixed> $customAttribute A single fragment with at least
+     *                                              `attributeDefinitionId` plus one value key.
+     * @return T
+     *
+     * @throws \InvalidArgumentException  If `attributeDefinitionId` is missing.
+     * @throws \miralsoft\weclapp\api\Exception\NotFoundException   If the record does not exist.
+     * @throws \miralsoft\weclapp\api\Exception\OptimisticLockException If concurrently modified.
+     * @throws WeclappApiException
+     *
+     * @example Set a Docbee ticket id on a sales order
+     * ```php
+     * use miralsoft\weclapp\api\DTO\CustomAttributeDTO;
+     *
+     * $client->salesOrders()->setCustomAttribute(
+     *     $orderId,
+     *     CustomAttributeDTO::string($definitionId, 'TICKET-4711')
+     * );
+     * ```
+     */
+    public function setCustomAttribute(string $id, array $customAttribute): AbstractDTO
+    {
+        $definitionId = $customAttribute['attributeDefinitionId'] ?? null;
+
+        if (!is_string($definitionId) || $definitionId === '') {
+            throw new \InvalidArgumentException(
+                'setCustomAttribute() requires the $customAttribute fragment to contain a '
+                . 'non-empty "attributeDefinitionId". Use CustomAttributeDTO::string()/number()/… to build it.'
+            );
+        }
+
+        $raw   = $this->findRaw($id);
+        $attrs = (isset($raw['customAttributes']) && is_array($raw['customAttributes']))
+            ? $raw['customAttributes']
+            : [];
+
+        $replaced = false;
+        foreach ($attrs as $index => $existing) {
+            if (($existing['attributeDefinitionId'] ?? null) === $definitionId) {
+                $attrs[$index] = $customAttribute;
+                $replaced      = true;
+                break;
+            }
+        }
+
+        if (!$replaced) {
+            $attrs[] = $customAttribute;
+        }
+
+        $raw['customAttributes'] = array_values($attrs);
+
+        return $this->update($id, $raw);
+    }
+
+    /**
      * Delete a record by its weclapp ID.
      *
      * @param string $id The weclapp UUID of the record to delete.

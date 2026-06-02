@@ -7,6 +7,108 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased] — Branch `WeclappAPIv2`
 
+### Added — Custom attribute (user-defined field) management
+
+Full support for weclapp custom attributes (`customAttributes` / "benutzerdefinierte
+Felder") — managing the **definitions** (the field schema) and reading/writing
+**values** on any entity. Mirrors the Docbee library's `ensureDefinition` /
+`setCustomFieldValue` / `getCustomFieldValue` ergonomics.
+
+**All behaviours verified live against the miralsoft tenant** (definition
+`docbeeTicketId`, id=998852, STRING, scoped to salesOrder):
+ensure idempotency, atomic create-with-value + read-back, update-existing + read-back.
+
+**New files:**
+- `src/Enum/CustomAttributeType.php` — value types (STRING, INTEGER, DECIMAL, BOOLEAN, DATE, LIST, …)
+- `src/Enum/CustomAttributeEntityType.php` — 24 entity types that can carry custom attributes
+- `src/DTO/CustomAttributeDefinitionDTO.php` — maps `customAttributeDefinition`
+- `src/Resource/CustomAttributeDefinitionResource.php` — wraps `/api/v2/customAttributeDefinition`
+- 3 new unit test files (24 tests)
+
+**Client method:** `$client->customAttributeDefinitions(): CustomAttributeDefinitionResource`
+
+#### 1. Manage definitions
+
+```php
+use miralsoft\weclapp\api\Enum\CustomAttributeEntityType;
+use miralsoft\weclapp\api\Enum\CustomAttributeType;
+
+$defs = $client->customAttributeDefinitions();
+
+// Idempotent ensure — creates if missing, reuses if present (returns the definition incl. id)
+$def = $defs->ensure(
+    CustomAttributeEntityType::SalesOrder,
+    'docbeeTicketId',
+    'Docbee Ticket ID',
+    CustomAttributeType::String,
+);
+
+// List/find for a setup-UI dropdown
+$forSalesOrder = $defs->findByEntity(CustomAttributeEntityType::SalesOrder);
+$single        = $defs->findByKey('docbeeTicketId', CustomAttributeEntityType::SalesOrder);
+```
+
+| Method | Description |
+|---|---|
+| `ensure($entity, $key, $label, $type = String)` | Idempotent create-or-find; returns definition with `id` |
+| `findByEntity($entity)` | All definitions scoped to an entity (client-side filtered) |
+| `findByKey($key, $entity = null)` | Single definition by `attributeKey` |
+| `find($id)` / `listAll()` / `create($data)` | Standard CRUD (typed to `CustomAttributeDefinitionDTO`) |
+
+#### 2. Write values — atomic on create, or Read-Modify-Write on update
+
+```php
+use miralsoft\weclapp\api\DTO\CustomAttributeDTO;
+
+// Atomic: set the value in the same create call
+$order = $client->salesOrders()->create([
+    'customerId'       => $customerId,
+    'customAttributes' => [CustomAttributeDTO::string($def->id, 'TICKET-4711')],
+]);
+
+// On an existing record: setCustomAttribute() preserves all other fields
+$client->salesOrders()->setCustomAttribute(
+    $orderId,
+    CustomAttributeDTO::string($def->id, 'TICKET-4711'),
+);
+```
+
+Typed payload builders on `CustomAttributeDTO` produce the correct value field per
+type — the caller never assembles the raw payload manually:
+`string()`, `number()`, `boolean()`, `date()` (accepts `DateTimeInterface` or epoch ms,
+ms-precise), `selection()`.
+
+`setCustomAttribute()` lives on `AbstractResource`, so it works for **every** entity
+(salesOrder, article, customer, …). It uses the same safe Read-Modify-Write strategy
+as `patch()` (full raw payload, optimistic-locking-safe, dry-run compatible).
+
+#### 3. Read values
+
+```php
+$order  = $client->salesOrders()->find($orderId);
+
+$ticket = $order->getCustomAttribute($def->id)?->stringValue;   // typed read (recommended)
+$value  = $order->getCustomAttributeValue($def->id);            // best-effort scalar
+```
+
+`getCustomAttribute()` / `getCustomAttributeValue()` are available on **any** entity
+DTO that maps `customAttributes` (SalesOrderDTO, CustomerDTO, ArticleDTO, …);
+they return `null` on DTOs without custom attributes.
+
+> weclapp returns `customAttributes` in both single-record (`find`) and list
+> responses by default — no field-selector needed. Values are reliably present.
+
+#### Important API notes (discovered during live verification)
+
+- **Entity scope uses the `entities` array** (`["salesOrder"]`), NOT a separate
+  `attributeEntityType` field. Passing `attributeEntityType` on create fails
+  validation (`attributeEntityType must be empty for attributeType`). `ensure()`
+  handles this correctly.
+- **`entities` is not server-side filterable** — `findByEntity()` / `findByKey()`
+  query by `attributeKey` and filter the entity scope client-side.
+- **`attributeKey` is freely choosable** (e.g. `docbeeTicketId`) and is the stable
+  idempotency handle.
+
 ### Added — QuantityUnitResource (`/api/v2/unit`)
 
 New resource for reading and managing weclapp units of measure (Mengeneinheiten).

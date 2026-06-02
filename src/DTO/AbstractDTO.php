@@ -96,6 +96,56 @@ abstract class AbstractDTO
     }
 
     /**
+     * Return the custom attribute value object for a given definition ID, or null.
+     *
+     * Works on any entity DTO that maps a `customAttributes` property
+     * (SalesOrderDTO, CustomerDTO, ArticleDTO, …). Returns null on DTOs that do
+     * not carry custom attributes.
+     *
+     * @example
+     * $order  = $client->salesOrders()->find($id);
+     * $ticket = $order->getCustomAttribute($definitionId)?->stringValue;
+     */
+    public function getCustomAttribute(string $definitionId): ?CustomAttributeDTO
+    {
+        if (!property_exists($this, 'customAttributes')) {
+            return null;
+        }
+
+        /** @var mixed $attributes */
+        $attributes = $this->customAttributes;
+
+        if (!is_array($attributes)) {
+            return null;
+        }
+
+        foreach ($attributes as $attribute) {
+            if ($attribute instanceof CustomAttributeDTO
+                && $attribute->attributeDefinitionId === $definitionId
+            ) {
+                return $attribute;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Return the custom attribute *value* for a given definition ID as a scalar.
+     *
+     * Convenience wrapper around getCustomAttribute()->value(). Returns null when
+     * the attribute is absent. See {@see CustomAttributeDTO::value()} for the
+     * value-resolution rules and caveats.
+     *
+     * @example
+     * $ticketId = $order->getCustomAttributeValue($definitionId); // "TICKET-4711"
+     */
+    public function getCustomAttributeValue(string $definitionId): string|int|bool|null
+    {
+        return $this->getCustomAttribute($definitionId)?->value();
+    }
+
+    /**
      * Safely extract a string value from an array, returning the default if missing or null.
      *
      * @param array<string, mixed> $data
