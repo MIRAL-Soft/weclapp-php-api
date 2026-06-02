@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace miralsoft\weclapp\api\Resource;
 
 use miralsoft\weclapp\api\DTO\CustomAttributeDefinitionDTO;
+use miralsoft\weclapp\api\DTO\CustomAttributeDefinitionOrderDTO;
 use miralsoft\weclapp\api\Enum\CustomAttributeEntityType;
 use miralsoft\weclapp\api\Enum\CustomAttributeType;
 use miralsoft\weclapp\api\Exception\WeclappApiException;
 use miralsoft\weclapp\api\Query\QueryBuilder;
+use miralsoft\weclapp\api\Util\ResponseParser;
 
 /**
  * Resource class for weclapp Custom Attribute Definition operations.
@@ -85,6 +87,38 @@ class CustomAttributeDefinitionResource extends AbstractResource
     {
         /** @var CustomAttributeDefinitionDTO */
         return parent::create($data);
+    }
+
+    /**
+     * {@inheritdoc}
+     *
+     * @return CustomAttributeDefinitionDTO
+     */
+    public function update(string $id, array $data): CustomAttributeDefinitionDTO
+    {
+        /** @var CustomAttributeDefinitionDTO */
+        return parent::update($id, $data);
+    }
+
+    /**
+     * Delete a custom attribute definition by its ID.
+     *
+     * ⚠️ **DESTRUCTIVE — irreversible.** Deleting a definition removes the field
+     * itself **and all of its stored values across every entity** of the scoped
+     * type (e.g. every salesOrder that carried a value). This cannot be undone.
+     *
+     * As a rule, deletion of custom-field schema should originate from a human
+     * operator in the weclapp UI, not from automated sync processes. Use this
+     * method only for deliberate, reviewed cleanup.
+     *
+     * @param string $id The weclapp UUID of the definition to delete.
+     *
+     * @throws \miralsoft\weclapp\api\Exception\NotFoundException If the definition does not exist.
+     * @throws WeclappApiException
+     */
+    public function delete(string $id): void
+    {
+        parent::delete($id);
     }
 
     // -------------------------------------------------------------------------
@@ -194,5 +228,88 @@ class CustomAttributeDefinitionResource extends AbstractResource
             'showOnCreationDialog' => false,
             'defaultBooleanValue'  => false,
         ]);
+    }
+
+    // -------------------------------------------------------------------------
+    // Display ordering
+    // -------------------------------------------------------------------------
+
+    /**
+     * Read the UI display order of custom attribute definitions for an entity type.
+     *
+     * Wraps `GET /customAttributeDefinition/readOrder?entityType=…`. Returns the
+     * ordered list of definition IDs (with optional group overrides) as they are
+     * shown in the weclapp UI for the given entity type.
+     *
+     * Note: the `readOrder`/`updateOrder` endpoints accept the **extended** entity
+     * set (e.g. also `salesOrderItem`, `task`, `timeRecord`, …), which is why this
+     * method accepts a plain string in addition to the {@see CustomAttributeEntityType} enum.
+     *
+     * @param CustomAttributeEntityType|string $entityType Entity type to read the order for.
+     * @return list<CustomAttributeDefinitionOrderDTO>
+     *
+     * @throws WeclappApiException
+     *
+     * @example
+     * $order = $client->customAttributeDefinitions()->readOrder(CustomAttributeEntityType::SalesOrder);
+     * foreach ($order as $entry) {
+     *     echo $entry->id . ' (' . ($entry->overrideGroupName ?? 'no group') . ')' . PHP_EOL;
+     * }
+     */
+    public function readOrder(CustomAttributeEntityType|string $entityType): array
+    {
+        $entityValue = $entityType instanceof CustomAttributeEntityType ? $entityType->value : $entityType;
+
+        $data = $this->rateLimiter->execute(
+            fn () => $this->http->get(
+                $this->endpoint . '/readOrder',
+                '?' . http_build_query(['entityType' => $entityValue]),
+            )
+        );
+
+        return array_map(
+            static fn (array $item): CustomAttributeDefinitionOrderDTO => CustomAttributeDefinitionOrderDTO::fromArray($item),
+            ResponseParser::extractList($data),
+        );
+    }
+
+    /**
+     * Update the UI display order of custom attribute definitions for an entity type.
+     *
+     * Wraps `POST /customAttributeDefinition/updateOrder`. Submits the desired
+     * order as a list of `{id, overrideGroupName?}` entries. Returns the resulting
+     * order as confirmed by the server.
+     *
+     * @param CustomAttributeEntityType|string                       $entityType Entity type to reorder.
+     * @param list<array{id: string, overrideGroupName?: string|null}> $order     Ordered definition entries.
+     * @return list<CustomAttributeDefinitionOrderDTO>
+     *
+     * @throws \miralsoft\weclapp\api\Exception\ValidationException If the payload is rejected.
+     * @throws WeclappApiException
+     *
+     * @example
+     * $client->customAttributeDefinitions()->updateOrder(
+     *     CustomAttributeEntityType::SalesOrder,
+     *     [
+     *         ['id' => '998852'],
+     *         ['id' => '214107', 'overrideGroupName' => 'Integration'],
+     *     ],
+     * );
+     */
+    public function updateOrder(CustomAttributeEntityType|string $entityType, array $order): array
+    {
+        $entityValue = $entityType instanceof CustomAttributeEntityType ? $entityType->value : $entityType;
+
+        $data = $this->rateLimiter->execute(
+            fn () => $this->http->post(
+                $this->endpoint . '/updateOrder',
+                ['entityType' => $entityValue, 'order' => array_values($order)],
+            )
+        );
+
+        return array_map(
+            static fn (array $item): CustomAttributeDefinitionOrderDTO => CustomAttributeDefinitionOrderDTO::fromArray($item),
+            ResponseParser::extractList($data),
+        );
     }
 }

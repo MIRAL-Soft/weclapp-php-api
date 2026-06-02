@@ -179,4 +179,65 @@ final class CustomAttributeDefinitionResourceTest extends TestCase
 
         self::assertTrue(method_exists(new WeclappClient($config), 'customAttributeDefinitions'));
     }
+
+    // ── update / delete ─────────────────────────────────────────────────────────
+
+    public function test_update_returns_typed_definition(): void
+    {
+        $client = $this->makeClient([
+            new Response(200, [], json_encode($this->definitionPayload('998852', 'docbeeTicketId'))),
+        ]);
+
+        $def = $client->customAttributeDefinitions()->update('998852', ['label' => 'New Label']);
+
+        self::assertInstanceOf(CustomAttributeDefinitionDTO::class, $def);
+        self::assertSame('998852', $def->id);
+    }
+
+    public function test_delete_issues_delete_request(): void
+    {
+        $client = $this->makeClient([new Response(204)]);
+
+        $client->customAttributeDefinitions()->delete('998852');
+        $this->addToAssertionCount(1);
+    }
+
+    // ── readOrder / updateOrder ──────────────────────────────────────────────────
+
+    public function test_read_order_returns_order_dtos(): void
+    {
+        $client = $this->makeClient([
+            new Response(200, [], json_encode(['result' => [
+                ['id' => '998852'],
+                ['id' => '214107', 'overrideGroupName' => 'Integration'],
+            ]])),
+        ]);
+
+        $order = $client->customAttributeDefinitions()->readOrder(CustomAttributeEntityType::SalesOrder);
+
+        self::assertCount(2, $order);
+        self::assertSame('998852', $order[0]->id);
+        self::assertNull($order[0]->overrideGroupName);
+        self::assertSame('214107', $order[1]->id);
+        self::assertSame('Integration', $order[1]->overrideGroupName);
+    }
+
+    public function test_update_order_returns_order_dtos(): void
+    {
+        $client = $this->makeClient([
+            new Response(200, [], json_encode(['result' => [
+                ['id' => '214107'],
+                ['id' => '998852'],
+            ]])),
+        ]);
+
+        $order = $client->customAttributeDefinitions()->updateOrder(
+            CustomAttributeEntityType::SalesOrder,
+            [['id' => '214107'], ['id' => '998852']],
+        );
+
+        self::assertCount(2, $order);
+        self::assertSame('214107', $order[0]->id);
+        self::assertSame('998852', $order[1]->id);
+    }
 }

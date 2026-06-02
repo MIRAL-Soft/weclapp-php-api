@@ -792,6 +792,27 @@ maps `customAttributes` and return `null` when the attribute (or the property) i
 > (string → number → date → selectedValueId → boolean). For known-type fields prefer
 > the typed property, e.g. `getCustomAttribute($id)?->stringValue`.
 
+**Full definition management** — the resource covers the complete
+`/customAttributeDefinition` endpoint:
+
+```php
+$defs = $client->customAttributeDefinitions();
+
+$defs->find($id);                 // GET /id/{id}
+$defs->listAll();                 // GET (query)
+$defs->count();                   // GET /count
+$defs->create($data);             // POST
+$defs->update($id, $data);        // PUT /id/{id}
+$defs->delete($id);               // DELETE /id/{id}  — see warning below
+$defs->readOrder($entity);        // GET /readOrder    — UI display order
+$defs->updateOrder($entity, $order); // POST /updateOrder
+```
+
+> ⚠️ **`delete()` is destructive and irreversible:** deleting a definition removes
+> the field **and all of its stored values across every entity** of that type. As a
+> rule, schema deletion should be performed by a human operator in the weclapp UI,
+> not by automated sync. The method is exposed for deliberate, reviewed cleanup only.
+
 ### Number Ranges & Proforma Invoice Detection
 
 weclapp assigns every document type its own number series (e.g. `RE-` for invoices, `CLX-` for

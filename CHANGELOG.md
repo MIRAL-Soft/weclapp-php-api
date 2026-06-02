@@ -53,7 +53,15 @@ $single        = $defs->findByKey('docbeeTicketId', CustomAttributeEntityType::S
 | `ensure($entity, $key, $label, $type = String)` | Idempotent create-or-find; returns definition with `id` |
 | `findByEntity($entity)` | All definitions scoped to an entity (client-side filtered) |
 | `findByKey($key, $entity = null)` | Single definition by `attributeKey` |
-| `find($id)` / `listAll()` / `create($data)` | Standard CRUD (typed to `CustomAttributeDefinitionDTO`) |
+| `find($id)` / `listAll()` / `count()` | Read (typed to `CustomAttributeDefinitionDTO`) |
+| `create($data)` / `update($id, $data)` | Create / update (typed) |
+| `delete($id)` | Delete a definition — ⚠️ destructive (removes the field + all its values across every entity); documented with a warning |
+| `readOrder($entity)` / `updateOrder($entity, $order)` | Read/set the UI display order of custom fields per entity (`CustomAttributeDefinitionOrderDTO`) |
+
+This covers the **complete** `/customAttributeDefinition` endpoint surface
+(GET, POST, GET/{id}, PUT/{id}, DELETE/{id}, /count, /readOrder, /updateOrder).
+`readOrder` verified live; `delete` is exposed but flagged destructive — schema
+deletion should originate from a human operator, not automated sync.
 
 #### 2. Write values — atomic on create, or Read-Modify-Write on update
 
