@@ -213,6 +213,78 @@ class SalesInvoiceResource extends AbstractResource
     }
 
     /**
+     * Find all invoices belonging to a specific sales order.
+     *
+     * **weclapp filter quirk (live-verified):** the `salesOrderId` field is NOT
+     * filterable — `salesOrderId-eq=…` is rejected with HTTP 400 ("unexpected
+     * filter property"). The filterable path is the relation sub-property
+     * `salesOrders.id`, which this method uses to filter **server-side**. This
+     * keeps the request fast: the API returns only the matching invoices (e.g.
+     * 1888 total → exactly 1) instead of the full collection.
+     *
+     * **Performance:** a single paginated query (pageSize 1000) — one HTTP
+     * request for any order with ≤ 1000 invoices, which is always the case in
+     * practice. No preceding count() call is made. The result is then verified
+     * client-side (zero extra requests) so that a silently ignored/misunderstood
+     * filter can never return foreign invoices — mirroring the "server fuzzy →
+     * client exact" pattern used by other findBy* methods.
+     *
+     * Returns an empty list when the order has no invoices — never throws on
+     * "nothing found".
+     *
+     * @param string $salesOrderId The weclapp UUID of the sales order.
+     * @return list<SalesInvoiceDTO>
+     *
+     * @throws WeclappApiException
+     *
+     * @example
+     * foreach ($client->salesInvoices()->findBySalesOrder($orderId) as $invoice) {
+     *     // e.g. refresh the performance record (Leistungsnachweis) of each invoice
+     * }
+     */
+    public function findBySalesOrder(string $salesOrderId): array
+    {
+        if ($salesOrderId === '') {
+            return [];
+        }
+
+        $candidates = $this->listAll(
+            QueryBuilder::new()
+                ->filterEq('salesOrders.id', $salesOrderId)
+                ->sortByCreated('desc')
+        );
+
+        // Client-side exact match: an invoice belongs to the order if its
+        // salesOrderId matches or its salesOrders[] relation contains the ID.
+        // Pure in-memory filtering — adds no API request.
+        return array_values(array_filter(
+            $candidates,
+            fn (SalesInvoiceDTO $invoice): bool => $this->belongsToSalesOrder($invoice, $salesOrderId)
+        ));
+    }
+
+    /**
+     * Determine whether an invoice belongs to the given sales order.
+     *
+     * True if the invoice's `salesOrderId` equals the ID, or its `salesOrders[]`
+     * relation array contains an entry with that ID.
+     */
+    private function belongsToSalesOrder(SalesInvoiceDTO $invoice, string $salesOrderId): bool
+    {
+        if ($invoice->salesOrderId === $salesOrderId) {
+            return true;
+        }
+
+        foreach ($invoice->salesOrders as $relation) {
+            if (is_array($relation) && ($relation['id'] ?? null) === $salesOrderId) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * Find all open (unpaid) invoices.
      *
      * @return list<SalesInvoiceDTO>

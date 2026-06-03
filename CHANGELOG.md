@@ -7,6 +7,35 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased] — Branch `WeclappAPIv2`
 
+### Added — SalesInvoiceResource::findBySalesOrder()
+
+New `findBySalesOrder(string $salesOrderId): array` — returns all `SalesInvoiceDTO`
+belonging to a sales order. Slots in next to `findByCustomer()` / `findByInvoiceNumber()`.
+
+**Encapsulates a weclapp filter quirk (live-verified against the miralsoft tenant):**
+the `salesOrderId` field is **not filterable** — `salesOrderId-eq=…` is rejected with
+HTTP 400 ("unexpected filter property"). The filterable path is the relation
+sub-property `salesOrders.id`, which the method uses to filter **server-side**.
+
+```php
+$invoices = $client->salesInvoices()->findBySalesOrder($orderId);
+// e.g. refresh the performance record (Leistungsnachweis) of each invoice
+```
+
+- **Fastest possible load:** a single paginated query (pageSize 1000) → exactly
+  **one HTTP request** for any order with ≤ 1000 invoices (always true in practice).
+  The server-side `salesOrders.id` filter returns only the matching invoices (e.g.
+  1888 total → 1), not the whole collection. No preceding `count()` call.
+- **Robust:** the result is verified client-side (zero extra requests) — an invoice
+  belongs to the order if its `salesOrderId` matches *or* its `salesOrders[]` relation
+  contains the ID. This mirrors the "server fuzzy → client exact" pattern of other
+  `findBy*` methods and guards against a silently ignored/misunderstood filter.
+- Returns an **empty list** when the order has no invoices — never throws on
+  "nothing found". Returns immediately (no request) for an empty `$salesOrderId`.
+
+5 new unit tests. (`SalesOrderResource::findByOrderNumber()` already existed, so the
+optional symmetric helper required no change.)
+
 ### Added — Custom attribute (user-defined field) management
 
 Full support for weclapp custom attributes (`customAttributes` / "benutzerdefinierte

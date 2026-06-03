@@ -187,4 +187,78 @@ class SalesInvoiceResourceTest extends TestCase
 
         $client->salesInvoices()->findByInvoiceNumber('RE-UNKNOWN');
     }
+
+    // ── findBySalesOrder ────────────────────────────────────────────────────────
+
+    public function test_find_by_sales_order_returns_matching_invoices(): void
+    {
+        $payload = $this->invoicePayload('inv-1');
+        $payload['salesOrderId'] = 'so-42';
+        $payload['salesOrders']  = [['id' => 'so-42']];
+
+        $client = $this->makeClient([
+            new Response(200, [], json_encode(['result' => [$payload]])),
+        ]);
+
+        $result = $client->salesInvoices()->findBySalesOrder('so-42');
+
+        self::assertCount(1, $result);
+        self::assertSame('inv-1', $result[0]->id);
+    }
+
+    public function test_find_by_sales_order_matches_via_relation_array_only(): void
+    {
+        // salesOrderId is null, but the salesOrders[] relation carries the ID
+        $payload = $this->invoicePayload('inv-2');
+        $payload['salesOrderId'] = null;
+        $payload['salesOrders']  = [['id' => 'so-42']];
+
+        $client = $this->makeClient([
+            new Response(200, [], json_encode(['result' => [$payload]])),
+        ]);
+
+        $result = $client->salesInvoices()->findBySalesOrder('so-42');
+
+        self::assertCount(1, $result);
+        self::assertSame('inv-2', $result[0]->id);
+    }
+
+    public function test_find_by_sales_order_filters_out_foreign_invoices_client_side(): void
+    {
+        // Simulate a silently-ignored server filter: API returns a foreign invoice.
+        // The client-side exact check must drop it.
+        $match = $this->invoicePayload('inv-match');
+        $match['salesOrderId'] = 'so-42';
+        $match['salesOrders']  = [['id' => 'so-42']];
+
+        $foreign = $this->invoicePayload('inv-foreign');
+        $foreign['salesOrderId'] = 'so-99';
+        $foreign['salesOrders']  = [['id' => 'so-99']];
+
+        $client = $this->makeClient([
+            new Response(200, [], json_encode(['result' => [$match, $foreign]])),
+        ]);
+
+        $result = $client->salesInvoices()->findBySalesOrder('so-42');
+
+        self::assertCount(1, $result);
+        self::assertSame('inv-match', $result[0]->id);
+    }
+
+    public function test_find_by_sales_order_returns_empty_list_when_none(): void
+    {
+        $client = $this->makeClient([
+            new Response(200, [], json_encode(['result' => []])),
+        ]);
+
+        self::assertSame([], $client->salesInvoices()->findBySalesOrder('so-unknown'));
+    }
+
+    public function test_find_by_sales_order_returns_empty_for_empty_id_without_request(): void
+    {
+        // No HTTP responses queued — if a request were made, MockHandler would throw.
+        $client = $this->makeClient([]);
+
+        self::assertSame([], $client->salesInvoices()->findBySalesOrder(''));
+    }
 }

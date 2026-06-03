@@ -521,6 +521,15 @@ $open = $invoices->findOpen();
 // Works for all invoice types: regular (RE-*), credit notes (CLX-*), proforma (PR-*)
 $invoice = $client->salesInvoices()->findByInvoiceNumber('RE-10042');
 
+// Find all invoices for a customer / for a sales order
+$forCustomer = $invoices->findByCustomer($customerId);
+$forOrder    = $invoices->findBySalesOrder($salesOrderId); // empty list if none
+
+// NOTE on findBySalesOrder(): the salesOrderId field is NOT filterable in weclapp
+// (salesOrderId-eq → HTTP 400). The library filters server-side via the relation
+// salesOrders.id (one request, returns only the matching invoices) and verifies the
+// match client-side. You don't need to know the quirk — just call the method.
+
 // Download invoice PDF
 $pdf = $invoices->getPdf($invoiceId);
 file_put_contents('invoice.pdf', $pdf);
@@ -1409,6 +1418,7 @@ php vendor/bin/phpunit   # Unit: OK · Integration: S (skipped)
 | `CustomerResourceIntegrationTest` | read-only | list, find by ID, count, `modifiedSince`, `findByCustomerNumber`, NotFoundException |
 | `SalesOrderResourceIntegrationTest` | read-only | list, find by ID, status enum, `findByOrderNumber`, `findByCustomer`, `findByStatus` |
 | `SalesInvoiceResourceIntegrationTest` | read-only | list, find by ID, status enum, count, `findByInvoiceNumber`, `findCreditNotes`, `resolveCustomerDisplayName` |
+| `SalesInvoiceResourceTest` | **unit test** | `findBySalesOrder` server-side `salesOrders.id` filter, client-side exact match, foreign-invoice rejection, empty-list/empty-id handling |
 | `ArticleResourceIntegrationTest` | read-only | list, find by number, NotFoundException, `findCategoryIdByNumber`, `cursor()` lazy pagination |
 | `ContactResourceIntegrationTest` | read-only | list, find by ID, count, `loadFromStubs()` |
 | `NumberRangeResourceIntegrationTest` | read-only | at least one range, all types known, proforma prefix, `isCurrentlyActive()` |
