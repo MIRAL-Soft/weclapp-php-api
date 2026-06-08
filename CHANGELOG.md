@@ -7,6 +7,71 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased] — Branch `WeclappAPIv2`
 
+### Added — RecurringInvoiceResource (read-only, `/api/v2/recurringInvoice`)
+
+Wraps weclapp's **recurring invoice** (wiederkehrende Rechnung) entity — the
+template weclapp uses to auto-generate sales invoices at a fixed interval. It is
+the authoritative source for a managed-service contract's billing cadence
+(monthly, yearly, …) and the billed positions/quantities/amounts per customer.
+This interval was previously unreadable via the library (not on SalesInvoice, not
+on Article; `contractBillingCycle` is empty in practice; `InvoicingType` only knows
+EFFORT/FIXED_PRICE).
+
+**New files:**
+- `src/DTO/RecurringInvoiceDTO.php` + `src/DTO/RecurringInvoiceItemDTO.php`
+- `src/Enum/RecurringInvoiceIntervalType.php`
+- `src/Resource/RecurringInvoiceResource.php`
+- `tests/Unit/Resource/RecurringInvoiceResourceTest.php` (18 tests)
+
+**Client accessor:** `$client->recurringInvoices(): RecurringInvoiceResource`
+
+**Read operations** (all verified live against the miralsoft tenant — 389 records):
+
+| Method | Description |
+|---|---|
+| `find($id)` | Single recurring invoice (typed `RecurringInvoiceDTO`) |
+| `list($query)` / `listAll($query)` | Paginated / all, with `QueryBuilder` filtering |
+| `count($query)` | Total matching count |
+| `findByCustomer($customerId)` | All recurring invoices of a customer |
+| `findByNumber($number)` | By human-readable number (null if absent) |
+| `findModifiedSince($since, $extra)` | Delta-sync |
+
+**Structured interval (the central value-add):**
+
+```php
+$ri = $client->recurringInvoices()->find($id);
+$ri->interval;               // 1
+$ri->intervalType;           // "MONTHLY" (raw)
+$ri->getIntervalType();      // RecurringInvoiceIntervalType::Monthly (or null if unmapped)
+$ri->getCadenceLabel();      // "every 1 MONTHLY"
+$ri->intervalDayOfMonth;     // 1
+$ri->getNextInvoiceDate();   // ?DateTimeImmutable
+$ri->desiredInvoiceStatus;   // "OPEN_ITEM_CREATED"
+
+foreach ($ri->recurringInvoiceItems as $item) {
+    $item->articleId; $item->getQuantity(); $item->getUnitPrice(); $item->getNetAmount();
+}
+```
+
+`RecurringInvoiceIntervalType` covers `MONTHLY`/`YEARLY` (confirmed live — 289/100 in
+the tenant) plus `DAILY`/`WEEKLY`/`QUARTERLY`/`HALF_YEARLY` defensively;
+`getIntervalType()` returns null for any unmapped value while the raw string stays
+available.
+
+**Read-only by design — verified against the live API:** the endpoint returns
+`Allow: GET, HEAD, OPTIONS`; POST/PUT/DELETE all yield **HTTP 405**. There is no
+create/update/delete (the consumer's "create-only later" is impossible — the API
+forbids writes). The inherited `create()`/`update()`/`delete()` are overridden to
+throw a clear `\LogicException` rather than issue a request that always fails.
+
+Notes:
+- The endpoint is **not described in the published OpenAPI document** but is fully
+  functional on live tenants.
+- There is **no explicit active/paused flag** in the schema; a future
+  `nextInvoiceDate` is the practical signal that generation is ongoing.
+- **Webhook (Trigger → Read):** `WebhookEntityName::RecurringInvoice` already exists;
+  on a webhook event, re-read via `recurringInvoices()->find($payload['entityId'])`.
+
 ### Added — SalesInvoiceResource::findBySalesOrder()
 
 New `findBySalesOrder(string $salesOrderId): array` — returns all `SalesInvoiceDTO`

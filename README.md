@@ -561,6 +561,72 @@ foreach ($invoice->salesInvoiceItems as $item) {
 }
 ```
 
+### Recurring Invoices (read-only)
+
+Recurring invoices (wiederkehrende Rechnungen) are the templates weclapp uses to
+auto-generate sales invoices at a fixed interval — the authoritative source for a
+managed-service contract's **billing cadence** and its billed positions per customer.
+
+```php
+$ri = $client->recurringInvoices();
+
+// Read by id / number / customer
+$one      = $ri->find($id);
+$byNumber = $ri->findByNumber('1001');          // ?RecurringInvoiceDTO
+$forCust  = $ri->findByCustomer($customerId);    // list
+
+// Paginate / count / delta-sync
+$page    = $ri->list(QueryBuilder::new()->pageSize(50));
+$total   = $ri->count();
+$changed = $ri->findModifiedSince($lastSyncMs);
+
+// ── Structured billing interval ──────────────────────────────────────────────
+echo $one->interval;              // 1
+echo $one->intervalType;          // "MONTHLY" (raw string, always available)
+echo $one->getIntervalType()?->name; // "Monthly" (typed enum, null if unmapped)
+echo $one->getCadenceLabel();     // "every 1 MONTHLY"
+echo $one->intervalDayOfMonth;    // 1
+echo $one->getNextInvoiceDate()?->format('Y-m-d');
+echo $one->desiredInvoiceStatus;  // "OPEN_ITEM_CREATED"
+
+// ── Billed positions ─────────────────────────────────────────────────────────
+foreach ($one->recurringInvoiceItems as $item) {
+    echo $item->title;
+    echo $item->articleId;
+    echo $item->getQuantity();    // ?float
+    echo $item->getUnitPrice();   // ?float
+    echo $item->getNetAmount();   // ?float
+}
+```
+
+> **Read-only by design (verified live):** the weclapp `recurringInvoice` endpoint
+> returns `Allow: GET, HEAD, OPTIONS` — POST/PUT/DELETE yield HTTP 405. The resource
+> therefore exposes no create/update/delete; the inherited write methods throw a
+> `\LogicException` instead of issuing a doomed request.
+
+> **No active flag:** the schema has no explicit active/paused field. A future
+> `getNextInvoiceDate()` is the practical signal that generation is ongoing.
+
+> **Webhook (Trigger → Read):** subscribe with `WebhookEntityName::RecurringInvoice`,
+> then on each event re-read via `recurringInvoices()->find($payload['entityId'])`.
+
+**Available fields on `RecurringInvoiceDTO`:**
+
+| Field | Type | Description |
+|---|---|---|
+| `id`, `version` | `string` | UUID / optimistic-lock version |
+| `recurringInvoiceNumber` | `?string` | Human-readable number |
+| `customerId` | `string` | Billed customer |
+| `interval` | `?int` | Numeric repeat factor |
+| `intervalType` | `?string` | Period (MONTHLY, YEARLY, …) |
+| `intervalDayOfMonth` | `?int` | Day of month for generation |
+| `nextInvoiceDate` | `?int` | Next run (epoch ms) — use `getNextInvoiceDate()` |
+| `desiredInvoiceStatus` | `?string` | Target status of generated invoices |
+| `servicePeriodFromKey` / `servicePeriodToKey` | `?string` | Service-period rule keys |
+| `netAmount` / `grossAmount` | `?string` | Totals per generated invoice (decimal strings) |
+| `recurringInvoiceItems` | `list<RecurringInvoiceItemDTO>` | Billed positions |
+| `customAttributes` | `list<CustomAttributeDTO>` | Custom field values |
+
 ### Documents
 
 Documents are file attachments that belong to weclapp entities (invoices, orders, customers, etc.).
@@ -1419,6 +1485,7 @@ php vendor/bin/phpunit   # Unit: OK · Integration: S (skipped)
 | `SalesOrderResourceIntegrationTest` | read-only | list, find by ID, status enum, `findByOrderNumber`, `findByCustomer`, `findByStatus` |
 | `SalesInvoiceResourceIntegrationTest` | read-only | list, find by ID, status enum, count, `findByInvoiceNumber`, `findCreditNotes`, `resolveCustomerDisplayName` |
 | `SalesInvoiceResourceTest` | **unit test** | `findBySalesOrder` server-side `salesOrders.id` filter, client-side exact match, foreign-invoice rejection, empty-list/empty-id handling |
+| `RecurringInvoiceResourceTest` | **unit test** | DTO hydration, interval helpers (`getIntervalType`/`getCadenceLabel`/`getNextInvoiceDate`), typed items, `find`/`findByCustomer`/`findByNumber`/`findModifiedSince`, read-only guards (405 → LogicException) |
 | `ArticleResourceIntegrationTest` | read-only | list, find by number, NotFoundException, `findCategoryIdByNumber`, `cursor()` lazy pagination |
 | `ContactResourceIntegrationTest` | read-only | list, find by ID, count, `loadFromStubs()` |
 | `NumberRangeResourceIntegrationTest` | read-only | at least one range, all types known, proforma prefix, `isCurrentlyActive()` |

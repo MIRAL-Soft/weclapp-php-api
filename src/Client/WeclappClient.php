@@ -18,6 +18,7 @@ use miralsoft\weclapp\api\Resource\PartyResource;
 use miralsoft\weclapp\api\Resource\QuantityUnitResource;
 use miralsoft\weclapp\api\Resource\PurchaseOrderResource;
 use miralsoft\weclapp\api\Resource\QuotationResource;
+use miralsoft\weclapp\api\Resource\RecurringInvoiceResource;
 use miralsoft\weclapp\api\Resource\SalesInvoiceResource;
 use miralsoft\weclapp\api\Resource\SalesOrderResource;
 use miralsoft\weclapp\api\Resource\ShipmentResource;
@@ -395,5 +396,36 @@ final class WeclappClient
     public function customAttributeDefinitions(): CustomAttributeDefinitionResource
     {
         return new CustomAttributeDefinitionResource($this->http, $this->rateLimiter, $this->cache);
+    }
+
+    /**
+     * Returns the Recurring Invoice resource (read-only).
+     *
+     * Recurring invoices are the templates weclapp uses to generate sales invoices
+     * at a fixed interval — the authoritative source for a managed-service
+     * contract's billing cadence (monthly, yearly, …) and the billed
+     * positions/quantities/amounts per customer.
+     *
+     * The endpoint is read-only (weclapp returns HTTP 405 for POST/PUT/DELETE).
+     *
+     * Endpoint: /api/v2/recurringInvoice
+     *
+     * @example Read the billing interval and next run of a customer's recurring invoices:
+     * ```php
+     * foreach ($client->recurringInvoices()->findByCustomer($customerId) as $ri) {
+     *     echo $ri->getCadenceLabel();              // "every 1 MONTHLY"
+     *     echo $ri->getNextInvoiceDate()?->format('Y-m-d');
+     *     foreach ($ri->recurringInvoiceItems as $item) {
+     *         echo $item->title . ' × ' . $item->getQuantity();
+     *     }
+     * }
+     *
+     * // Delta-sync
+     * $changed = $client->recurringInvoices()->findModifiedSince($lastSyncMs);
+     * ```
+     */
+    public function recurringInvoices(): RecurringInvoiceResource
+    {
+        return new RecurringInvoiceResource($this->http, $this->rateLimiter, $this->cache);
     }
 }
