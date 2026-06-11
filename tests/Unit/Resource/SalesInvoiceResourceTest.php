@@ -188,6 +188,26 @@ class SalesInvoiceResourceTest extends TestCase
         $client->salesInvoices()->findByInvoiceNumber('RE-UNKNOWN');
     }
 
+    // ── findOpen ────────────────────────────────────────────────────────────────
+
+    public function test_find_open_filters_by_payment_status_open(): void
+    {
+        // Regression: findOpen() previously filtered on "openAmount", a field that
+        // does not exist in the weclapp schema (HTTP 400 on every call). It must
+        // filter on paymentStatus=OPEN.
+        $payload = $this->invoicePayload('inv-open');
+        $payload['paymentStatus'] = 'OPEN';
+
+        $client = $this->makeClient([
+            new Response(200, [], json_encode(['result' => [$payload]])),
+        ]);
+
+        $result = $client->salesInvoices()->findOpen();
+
+        self::assertCount(1, $result);
+        self::assertSame('inv-open', $result[0]->id);
+    }
+
     // ── findBySalesOrder ────────────────────────────────────────────────────────
 
     public function test_find_by_sales_order_returns_matching_invoices(): void

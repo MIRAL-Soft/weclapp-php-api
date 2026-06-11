@@ -8,6 +8,7 @@ use miralsoft\weclapp\api\Client\HttpClient;
 use miralsoft\weclapp\api\Client\RateLimiter;
 use miralsoft\weclapp\api\DTO\PartyDTO;
 use miralsoft\weclapp\api\DTO\SalesInvoiceDTO;
+use miralsoft\weclapp\api\Enum\PaymentStatus;
 use miralsoft\weclapp\api\Enum\SalesInvoiceType;
 use miralsoft\weclapp\api\Exception\WeclappApiException;
 use miralsoft\weclapp\api\Query\QueryBuilder;
@@ -289,6 +290,11 @@ class SalesInvoiceResource extends AbstractResource
     /**
      * Find all open (unpaid) invoices.
      *
+     * Filters server-side on `paymentStatus = OPEN` (verified live; 314 matches
+     * on the reference tenant). Note: the previously used `openAmount` field
+     * does not exist in the weclapp API schema — filtering on it was rejected
+     * with HTTP 400 on every call.
+     *
      * @return list<SalesInvoiceDTO>
      *
      * @throws WeclappApiException
@@ -296,7 +302,7 @@ class SalesInvoiceResource extends AbstractResource
     public function findOpen(): array
     {
         $result = $this->listAll(
-            QueryBuilder::new()->filterGt('openAmount', 0)
+            QueryBuilder::new()->filterEq('paymentStatus', PaymentStatus::Open->value)
         );
 
         /** @var list<SalesInvoiceDTO> */
