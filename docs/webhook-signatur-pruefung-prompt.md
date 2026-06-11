@@ -1,8 +1,34 @@
 # Prompt für den Konsumenten: Webhook-Signatur-Prüfung
 
-> Diesen Prompt an das Projekt geben, das die weclapp-Webhooks empfängt
-> (z. B. den weclapp→Docbee-Exporter). Ziel: ein für alle Mal klären, ob
-> weclapp Webhook-Requests signiert.
+> ## ✅ ERLEDIGT — Ergebnis vom 11.06.2026
+>
+> Der Konsument hat eine echte Zustellung geloggt:
+>
+> ```json
+> {
+>     "method": "POST",
+>     "ip": "3.73.185.97",
+>     "headers": {
+>         "User-Agent": "weclapp/22 (weclapp webhook sender)",
+>         "Content-Type": "application/json",
+>         "Content-Length": "60"
+>     },
+>     "rawBody": "{\"entityId\":\"975300\",\"entityName\":\"contact\",\"type\":\"UPDATE\"}"
+> }
+> ```
+>
+> **Befund:** KEIN Signatur-/HMAC-Header vorhanden. weclapp signiert Webhooks
+> nicht. Konsequenz umgesetzt: `WebhookValidator` aus der Library entfernt,
+> Payload-Format als bestätigt dokumentiert (Feld heißt `type`, nicht
+> `eventType`; Werte uppercase), neues `WebhookEventDTO` zum Parsen ergänzt.
+> Sicherheitsmodell: Webhooks sind reine Trigger — Daten immer per
+> authentifiziertem API-Read holen.
+
+---
+
+> *Ursprünglicher Prompt (archiviert):* Diesen Prompt an das Projekt geben, das
+> die weclapp-Webhooks empfängt (z. B. den weclapp→Docbee-Exporter). Ziel: ein
+> für alle Mal klären, ob weclapp Webhook-Requests signiert.
 
 ---
 

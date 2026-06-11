@@ -1369,26 +1369,52 @@ $range = $client->numberRanges()->findByType('PROFORMA_INVOICE');
 
 ---
 
-## Webhook Signature Verification
+## Receiving Webhooks (payload & security)
 
-Always verify the HMAC-SHA256 signature on incoming webhook requests to prevent spoofing:
+**Live-confirmed (logged delivery, 2026-06-11):** weclapp POSTs exactly this JSON
+body to the subscribed URL — and the requests are **NOT signed** (no
+`X-Weclapp-Signature`, no HMAC header of any kind):
+
+```json
+{"entityId":"975300","entityName":"contact","type":"UPDATE"}
+```
+
+Note the field is named `type` (not `eventType`) and values are uppercase
+(`CREATE` | `UPDATE` | `DELETE`).
+
+Parse incoming deliveries with `WebhookEventDTO`:
 
 ```php
-use miralsoft\weclapp\api\Util\WebhookValidator;
+use miralsoft\weclapp\api\DTO\WebhookEventDTO;
+use miralsoft\weclapp\api\Enum\WebhookEntityName;
+use miralsoft\weclapp\api\Enum\WebhookEventAction;
 
-// In your webhook handler (e.g. a Symfony controller):
-$secret    = $_ENV['WECLAPP_WEBHOOK_SECRET'];
-$payload   = file_get_contents('php://input');
-$signature = $_SERVER['HTTP_X_WECLAPP_SIGNATURE'] ?? '';
+$event = WebhookEventDTO::fromJson(file_get_contents('php://input'));
 
-if (!WebhookValidator::verify($payload, $signature, $secret)) {
-    http_response_code(401);
-    exit('Invalid webhook signature.');
+if ($event === null) {
+    http_response_code(400);
+    exit('Not a weclapp webhook payload.');
 }
 
-$event = json_decode($payload, true);
-// Process $event safely...
+if ($event->getEntityName() === WebhookEntityName::SalesOrder
+    && $event->getAction() === WebhookEventAction::Update
+) {
+    // SECURITY: never act on the payload itself — re-read via the authenticated API
+    $order = $client->salesOrders()->find($event->entityId);
+    // ... process $order
+}
 ```
+
+> **Security model:** since weclapp webhooks are unsigned, treat them strictly as
+> *triggers*. Always re-read the entity through the authenticated API and work
+> with that data. The only available spoofing hurdle is embedding a random token
+> in the subscribed URL (e.g. `https://app.example.com/hooks/weclapp/{random}`)
+> and rejecting requests to any other path.
+>
+> The former `WebhookValidator` class has been **removed**: it implemented
+> verification of an `X-Weclapp-Signature` header that weclapp never sends
+> (live-verified) — keeping it would have suggested a security guarantee that
+> does not exist.
 
 ---
 

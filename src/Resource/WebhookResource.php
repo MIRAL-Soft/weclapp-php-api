@@ -69,13 +69,16 @@ use miralsoft\weclapp\api\Exception\WeclappApiException;
  *   call listAll() and filter client-side. Webhook counts are typically very low
  *   (< 50 per tenant) so one extra GET request per operation is acceptable.
  *
- * Incoming webhook payload (UNCONFIRMED — verify by logging live traffic):
- *   weclapp is expected to POST a JSON body containing at minimum:
- *     - entityId   (string) — UUID of the affected entity
+ * Incoming webhook payload (CONFIRMED by logging a live delivery, 2026-06-11):
+ *   weclapp POSTs exactly this JSON body — no additional fields:
+ *     {"entityId":"975300","entityName":"contact","type":"UPDATE"}
+ *     - entityId   (string) — ID of the affected entity
  *     - entityName (string) — same value as the subscription's entityName
- *     - eventType  (string) — expected to be "created" | "updated" | "deleted"
- *   Additional fields (tenantName, timestamp, etc.) may be present. Log incoming
- *   requests in the consumer application to confirm the exact structure.
+ *     - type       (string) — "CREATE" | "UPDATE" | "DELETE" (note: the field is
+ *                             named "type", NOT "eventType"; values are uppercase)
+ *   Parse with {@see \miralsoft\weclapp\api\DTO\WebhookEventDTO::fromJson()}.
+ *   Delivery headers (confirmed): User-Agent "weclapp/<n> (weclapp webhook sender)",
+ *   Content-Type application/json — and nothing else relevant.
  *
  * Deactivation:
  *   weclapp sets deactivatedDate automatically after repeated delivery failures.
@@ -84,10 +87,13 @@ use miralsoft\weclapp\api\Exception\WeclappApiException;
  *   with deactivatedDate: null has NOT been verified against the live API — if
  *   rejected, prompt the user to re-activate manually in the weclapp admin UI.
  *
- * Security:
- *   The weclapp webhook schema has no secret or signature field. No request signing
- *   is performed or supported. Do not rely on weclapp webhooks as a security
- *   boundary — use them only as a trigger for a subsequent authenticated data sync.
+ * Security (CONFIRMED by logging a live delivery, 2026-06-11):
+ *   weclapp does NOT sign webhook requests. A real delivery carried no
+ *   X-Weclapp-Signature and no other signature/HMAC header of any kind.
+ *   Do not rely on weclapp webhooks as a security boundary — use them only as a
+ *   trigger for a subsequent authenticated data sync (re-read the entity via the
+ *   API; never trust the payload content). The only available spoofing hurdle is
+ *   embedding a random token in the subscribed URL and rejecting other paths.
  *
  * Limits:
  *   No documented limit on webhook subscriptions per tenant or delivery rate limit

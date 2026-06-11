@@ -7,6 +7,48 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased] — Branch `WeclappAPIv2`
 
+### Removed — WebhookValidator (claimed a signature weclapp never sends)
+
+The open contradiction around webhook signing is **settled by logging a real
+delivery** (2026-06-11): weclapp sends **no signature/HMAC header of any kind**
+(headers: `User-Agent: weclapp/22 (weclapp webhook sender)`, `Content-Type`,
+`Content-Length` — nothing else relevant). `WebhookValidator` implemented
+verification of an `X-Weclapp-Signature` header that does not exist; keeping it
+would have suggested a security guarantee weclapp does not provide. Class and
+test removed.
+
+**Security model (documented in WebhookResource + README):** weclapp webhooks
+are unsigned — treat them strictly as *triggers*. Always re-read the entity via
+the authenticated API; never act on payload content. The only spoofing hurdle
+available is a random token embedded in the subscribed URL.
+
+### Added — WebhookEventDTO (live-confirmed incoming payload format)
+
+The same logged delivery confirmed the exact payload structure:
+
+```json
+{"entityId":"975300","entityName":"contact","type":"UPDATE"}
+```
+
+Key finding: the action field is named **`type`** (not `eventType` as previously
+assumed) and values are uppercase. New components:
+
+- `WebhookEventDTO` — `fromJson($rawBody)` parses an incoming delivery (returns
+  null for non-webhook bodies), `getAction()` / `getEntityName()` return typed
+  enums while the raw strings stay accessible.
+- `WebhookEventAction` enum — `CREATE` / `UPDATE` / `DELETE` (`UPDATE`
+  live-confirmed; the others follow from the atCreate/atUpdate/atDelete flags).
+- `WebhookResource` docblock updated: payload section now CONFIRMED, security
+  section now CONFIRMED (previously "expected"/"unconfirmed").
+- 7 unit tests, fixture = the exact live payload.
+
+```php
+$event = WebhookEventDTO::fromJson(file_get_contents('php://input'));
+if ($event?->getEntityName() === WebhookEntityName::SalesOrder) {
+    $order = $client->salesOrders()->find($event->entityId); // authoritative read
+}
+```
+
 ### Removed — legacy v1 classes (BREAKING)
 
 All API-v1 classes have been **deleted**: `APICall`, `WeclappAPICall`, `Config`,
