@@ -104,19 +104,22 @@ $config = WeclappConfig::fromArray([
 
 | Method | Endpoint | Description |
 |---|---|---|
-| `$client->customers()` | `/customer` | Customers (organisations & persons) |
-| `$client->contacts()` | `/contact` | Contact persons linked to customers |
-| `$client->suppliers()` | `/supplier` | Suppliers |
+| `$client->customers()` | `/party` (filtered) | Customers — parties with a customerNumber |
+| `$client->contacts()` | `/party` (filtered) | Contact persons linked to a parent organisation |
+| `$client->suppliers()` | `/party` (filtered) | Suppliers — parties with a supplierNumber |
+| `$client->parties()` | `/party` | Party identity lookup (resolves partyId to name/number) |
 | `$client->articles()` | `/article` | Products / articles |
 | `$client->articleCategories()` | `/articleCategory` | Article category tree |
+| `$client->quantityUnits()` | `/unit` | Units of measure incl. time-based units (`timeUnitAmount`) |
 | `$client->salesOrders()` | `/salesOrder` | Sales orders + PDF download |
 | `$client->salesInvoices()` | `/salesInvoice` | Sales invoices + PDF download |
+| `$client->recurringInvoices()` | `/recurringInvoice` | Recurring invoices (billing cadence) — read-only |
 | `$client->quotations()` | `/quotation` | Quotations + PDF + order conversion |
 | `$client->purchaseOrders()` | `/purchaseOrder` | Purchase orders + PDF download |
 | `$client->shipments()` | `/shipment` | Shipments + delivery note / label PDFs |
 | `$client->tickets()` | `/ticket` | Support tickets |
 | `$client->documents()` | `/document` | File attachments on any entity — query, download, upload |
-| `$client->parties()` | `/party` | Party identity lookup (resolves partyId to name/number) |
+| `$client->customAttributeDefinitions()` | `/customAttributeDefinition` | User-defined field schema (ensure/find/order) |
 | `$client->numberRanges()` | `/numberRange` | Number range config — read-only |
 | `$client->numberRangeValues()` | `/numberRangeValue` | Number range counters and prefixes — read-only |
 | `$client->webhooks()` | `/webhook` | Event-driven webhook subscriptions |
