@@ -39,11 +39,39 @@ Nur für den wöchentlichen Spec-Download nötig (die Test-CI braucht keine Secr
 > Empfehlung: dafür einen eigenen, **rein lesenden** API-Benutzer in weclapp
 > anlegen — der Spec-Download braucht keine Schreibrechte.
 
-### Schritt 3 — Schreibrechte für den Spec-Updater prüfen
-Der Updater committet Änderungen zurück ins Repo. Dafür muss unter
-**Settings → Actions → General → Workflow permissions** die Option
-**"Read and write permissions"** aktiviert sein (oder die im Workflow gesetzte
-`permissions: contents: write` greift — das ist bei Standard-Einstellungen der Fall).
+### Schritt 3 — Schreibrechte für den Spec-Updater (nur für den Auto-Push)
+
+> Betrifft **ausschließlich** den optionalen Spec-Updater. Die Test-CI (`ci.yml`)
+> braucht nur Leserechte und läuft ohne diesen Schritt. Wer den Auto-Push der
+> Spec nicht braucht, kann Schritt 3 überspringen und die Spec stattdessen lokal
+> mit `composer spec:update` aktualisieren.
+
+Der Updater committet die aktualisierte `openapi_v2.json` zurück ins Repo, dazu
+braucht das `GITHUB_TOKEN` Schreibrechte. Der Workflow fordert sie bereits an
+(`permissions: contents: write`), **aber** eine Organisations-Policy kann das
+hart auf „read" begrenzen.
+
+**Symptom:** Unter **Repo → Settings → Actions → General → Workflow permissions**
+ist „Read and write permissions" ausgegraut und nicht wählbar. Das heißt: die
+Organisation (`MIRAL-Soft`) erzwingt read-only, und das Repo darf nicht erhöhen —
+der `permissions:`-Block im Workflow greift dann nicht, der Push scheitert mit
+HTTP 403.
+
+**Lösung — als Organisations-Admin** (nicht im Repo, sondern in den Org-Settings):
+
+1. `https://github.com/organizations/MIRAL-Soft/settings/actions` öffnen
+   (oder: GitHub → Organisation `MIRAL-Soft` → **Settings → Actions → General**)
+2. Sektion **„Workflow permissions"**
+3. **„Read and write permissions"** wählen → **Save**
+
+Danach ist die Einstellung im Repo nicht mehr ausgegraut und der Spec-Updater
+kann pushen. Der bestehende Workflow muss **nicht** geändert werden.
+
+> **Sicherheitshinweis:** „Read and write" gilt dann für alle Workflows der
+> Organisation. Da unser Workflow `permissions: contents: write` bereits explizit
+> setzt, ist das vertretbar, aber org-weit. Wer das enger halten will, nutzt
+> stattdessen einen **Deploy Key** (separater Schlüssel nur für dieses Repo, umgeht
+> die Org-Policy komplett) — sag Bescheid, dann wird der Workflow darauf umgestellt.
 
 ### Schritt 4 — Funktionstest
 1. **Test-CI:** irgendeinen Commit pushen → Tab **Actions** → Workflow „CI" muss grün werden.
