@@ -34,7 +34,8 @@
   },
   "scripts": {
     "test": "phpunit --testsuite Unit",
-    "analyse": "phpstan analyse"
+    "analyse": "phpstan analyse",
+    "spec:update": "php bin/update-openapi-spec.php"
   },
   "config": {
     "sort-packages": true,

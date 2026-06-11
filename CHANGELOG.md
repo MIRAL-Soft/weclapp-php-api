@@ -7,6 +7,55 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased] — Branch `WeclappAPIv2`
 
+### Removed — legacy v1 classes (BREAKING)
+
+All API-v1 classes have been **deleted**: `APICall`, `WeclappAPICall`, `Config`,
+`Util`, `Article`, `ArticleCategory`, `Contact`, `Customer`, `SalesInvoice`,
+`SalesOrder` (root namespace) plus the loose v1 demo scripts under `tests/`
+(`articleList.php`, `customerList.php`, `configWeclapp.php`, …).
+
+Rationale: the weclapp v1 API is being shut down in 2026 and all active
+consumers use the v2 resources. Removing the dead code eliminates the
+contradiction between deprecated-but-present classes and the v2-only
+documentation. Migration guide: see "Migration from v1" in the README.
+
+`phpunit.xml` (coverage excludes) and `phpstan.neon` (now analysing all of
+`src/`) were simplified accordingly.
+
+### Fixed — SalesInvoiceResource::findOpen() filtered on a non-existent field
+
+`findOpen()` used `openAmount-gt=0`, but `openAmount` does not exist in the
+weclapp schema — **every call failed with HTTP 400** since the method was
+introduced. Now filters on `paymentStatus = OPEN` (live-verified: 314 open
+invoices). New `PaymentStatus` enum with all 6 schema values.
+
+### Added — automated OpenAPI spec refresh
+
+- `bin/update-openapi-spec.php` (+ `composer spec:update`) downloads the current
+  tenant spec from `https://{tenant}.weclapp.com/webapp/api/v2/meta/openapi.json`
+  (credentials from env or `tests/.env.test`), validates it and overwrites
+  `openapi_v2.json`. The spec file is now **tracked in git**.
+- `.github/workflows/update-openapi-spec.yml` runs the refresh weekly (Mondays
+  05:30 UTC, manual trigger possible) and commits only on change. Requires the
+  repository secrets `WECLAPP_TENANT` / `WECLAPP_TOKEN`.
+- Note: the tenant meta spec only lists licence-enabled endpoints (~450 paths)
+  and misses some live endpoints entirely (e.g. `/recurringInvoice`) — it is a
+  reference, not complete truth.
+
+### Added — GitHub Actions CI
+
+`.github/workflows/ci.yml` runs the unit tests and PHPStan (level 6) on PHP 8.3
+and 8.4 for every push and pull request — no credentials required (unit tests
+are fully mocked). Setup guide: `docs/CI-SETUP.md`.
+
+### Added — webhook signature verification task for consumers
+
+`docs/webhook-signatur-pruefung-prompt.md` — a ready-to-use prompt for webhook
+consumers to log real weclapp deliveries and settle the open contradiction
+between `WebhookValidator` (claims an `X-Weclapp-Signature` HMAC header) and
+the live-verified WebhookResource research (claims no signing exists). The
+validator's fate will be decided based on the result.
+
 ### Security & code-quality hardening (full-code review)
 
 A complete security/bug/best-practice review of the library was performed and all

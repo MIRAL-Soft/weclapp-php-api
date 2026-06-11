@@ -1,0 +1,50 @@
+name: Update OpenAPI Spec
+
+# Downloads the current weclapp OpenAPI spec for the tenant and commits it
+# when it changed. Runs weekly and can be triggered manually from the
+# Actions tab ("Run workflow").
+#
+# Required repository secrets (Settings → Secrets and variables → Actions):
+#   WECLAPP_TENANT — tenant subdomain (e.g. "miralsoft")
+#   WECLAPP_TOKEN  — weclapp API token
+
+on:
+  schedule:
+    # Every Monday 05:30 UTC
+    - cron: '30 5 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update-spec:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          coverage: none
+
+      - name: Download current spec
+        env:
+          WECLAPP_TENANT: ${{ secrets.WECLAPP_TENANT }}
+          WECLAPP_TOKEN: ${{ secrets.WECLAPP_TOKEN }}
+        run: php bin/update-openapi-spec.php
+
+      - name: Commit when changed
+        run: |
+          if git diff --quiet openapi_v2.json; then
+            echo "Spec unchanged — nothing to commit."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add openapi_v2.json
+          git commit -m "chore: update weclapp OpenAPI spec (automated weekly refresh)"
+          git push

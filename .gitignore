@@ -543,3 +543,10 @@ local.properties
 # Typically, this file would be tracked if it contains build/dependency configurations:
 #.project
 /upload
+
+##### Claude Code session data
+.claude/
+
+# Project CLI scripts (exception to the Eclipse bin/ build-output rule above)
+!/bin/
+!/bin/**

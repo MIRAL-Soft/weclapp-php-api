@@ -1921,16 +1921,13 @@ Embedded in `SalesInvoiceDTO::$salesInvoiceItems`. Maps the `salesInvoiceItem` s
 
 ## Migration from v1
 
-Version 1 classes (`Customer`, `Article`, `SalesOrder`, etc.) are still present but
-marked `@deprecated`. They continue to work against the v1 API endpoint until you migrate.
-
-> **Runtime deprecation notice:** since the latest release, instantiating a legacy v1
-> class (or calling `APICall::call()`) triggers a silenced `E_USER_DEPRECATED` notice
-> so the legacy usage shows up in error logs / collectors. The classes will be
-> **removed in the next major version** — migrate to the v2 resources below.
+The legacy v1 classes (`Customer`, `Article`, `SalesOrder`, `APICall`, `Config`,
+`Util`, `WeclappAPICall`, …) have been **removed** — the weclapp v1 API is being
+shut down in 2026 and this branch targets v2 exclusively. If your code still uses
+the v1 classes, migrate like this:
 
 ```php
-// ❌ Old (v1, deprecated — API shuts down August 2025)
+// ❌ Old (v1 — classes removed from this library)
 use miralsoft\weclapp\api\Config;
 use miralsoft\weclapp\api\Customer;
 
