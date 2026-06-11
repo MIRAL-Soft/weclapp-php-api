@@ -32,6 +32,8 @@ use miralsoft\weclapp\api\Query\QueryBuilder;
  * echo $hour->timeUnitAmount; // 3600 (seconds)
  *
  * @see \miralsoft\weclapp\api\DTO\QuantityUnitDTO
+ *
+ * @extends AbstractResource<\miralsoft\weclapp\api\DTO\QuantityUnitDTO>
  */
 class QuantityUnitResource extends AbstractResource
 {

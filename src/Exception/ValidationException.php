@@ -19,6 +19,8 @@ namespace miralsoft\weclapp\api\Exception;
  *         echo $error['field'] . ': ' . $error['message'];
  *     }
  * }
+ *
+ * @phpstan-consistent-constructor
  */
 class ValidationException extends WeclappApiException
 {

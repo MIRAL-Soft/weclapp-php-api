@@ -26,12 +26,12 @@ namespace miralsoft\weclapp\api\DTO;
 final class PaginatedResultDTO
 {
     /**
-     * @param list<AbstractDTO> $items    The DTOs for the current page.
-     * @param int               $total    Total number of matching records across all pages.
-     *                                    May be -1 if the API did not return a total count.
-     * @param int               $page     The 1-based current page number.
-     * @param int               $pageSize The number of items requested per page.
-     * @param bool              $hasMore  True if there are more pages after this one.
+     * @param list<T> $items    The DTOs for the current page.
+     * @param int     $total    Total number of matching records across all pages.
+     *                          May be -1 if the API did not return a total count.
+     * @param int     $page     The 1-based current page number.
+     * @param int     $pageSize The number of items requested per page.
+     * @param bool    $hasMore  True if there are more pages after this one.
      */
     public function __construct(
         public readonly array $items,

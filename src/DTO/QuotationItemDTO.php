@@ -63,8 +63,8 @@ final class QuotationItemDTO extends AbstractDTO
      * @param int|null                       $plannedWorkingTimePerUnit                Planned working time per unit in minutes.
      * @param list<CommissionSalesPartnerDTO> $commissionSalesPartners                 Commission assignments for sales partners.
      * @param list<ReductionAdditionItemDTO>  $reductionAdditionItems                 Surcharge / discount sub-items.
-     * @param array                          $quotationItemRelationships               Source relationships (complex, kept raw).
-     * @param array                          $scaleValues                              Scale price values (complex, kept raw).
+     * @param list<array<string, mixed>>     $quotationItemRelationships               Source relationships (complex, kept raw).
+     * @param list<array<string, mixed>>     $scaleValues                              Scale price values (complex, kept raw).
      * @param list<CustomAttributeDTO>       $customAttributes                        Custom attribute values.
      */
     public function __construct(

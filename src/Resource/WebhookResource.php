@@ -109,6 +109,8 @@ use miralsoft\weclapp\api\Exception\WeclappApiException;
  * foreach ($all as $hook) {
  *     echo $hook->entityName . ': ' . ($hook->isActive() ? 'active' : 'inactive') . PHP_EOL;
  * }
+ *
+ * @extends AbstractResource<\miralsoft\weclapp\api\DTO\WebhookDTO>
  */
 class WebhookResource extends AbstractResource
 {
@@ -360,7 +362,10 @@ class WebhookResource extends AbstractResource
             'atUpdate'         => $webhook->atUpdate,
             'atDelete'         => $webhook->atDelete,
             'requestMethod'    => $webhook->requestMethod,
-            'deactivatedDate'  => (int) (microtime(true) * 1000),
+            // format('Uv') = epoch seconds + zero-padded milliseconds — pure
+            // integer arithmetic, consistent with QueryBuilder::toEpochMs()
+            // (avoids float precision issues of microtime(true) * 1000).
+            'deactivatedDate'  => (int) (new \DateTimeImmutable())->format('Uv'),
         ]);
     }
 

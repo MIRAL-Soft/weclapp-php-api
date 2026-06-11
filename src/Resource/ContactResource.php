@@ -18,6 +18,8 @@ use miralsoft\weclapp\api\Query\QueryBuilder;
  *
  * For delta-sync with external systems use findModifiedSince()
  * to receive only contacts changed since the last synchronisation run.
+ *
+ * @extends AbstractResource<\miralsoft\weclapp\api\DTO\ContactDTO>
  */
 class ContactResource extends AbstractResource
 {
@@ -42,12 +44,10 @@ class ContactResource extends AbstractResource
      */
     public function findByEmail(string $email): array
     {
-        $result = $this->list(
+        /** @var list<ContactDTO> */
+        return $this->listAll(
             QueryBuilder::new()->filterEq('email', $email)
         );
-
-        /** @var list<ContactDTO> */
-        return $result->items;
     }
 
     /**
@@ -128,12 +128,10 @@ class ContactResource extends AbstractResource
      */
     public function findByCustomer(string $customerId): array
     {
-        $result = $this->list(
+        /** @var list<ContactDTO> */
+        return $this->listAll(
             QueryBuilder::new()->filterEq('customerId', $customerId)
         );
-
-        /** @var list<ContactDTO> */
-        return $result->items;
     }
 
     /**

@@ -1,0 +1,19 @@
+parameters:
+    level: 6
+
+    paths:
+        - src/Client
+        - src/Config
+        - src/DTO
+        - src/Enum
+        - src/Exception
+        - src/Query
+        - src/Resource
+        - src/Util/ResponseParser.php
+        - src/Util/WebhookValidator.php
+
+    # Legacy v1 classes (src/*.php root level, deprecated since 2.0) are
+    # intentionally excluded — they are frozen for backward compatibility
+    # and will be removed in the next major version.
+
+    treatPhpDocTypesAsCertain: false

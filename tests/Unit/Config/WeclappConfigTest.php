@@ -60,6 +60,38 @@ class WeclappConfigTest extends TestCase
         new WeclappConfig(tenant: 'miralsoft', token: '');
     }
 
+    public function test_throws_on_tenant_with_host_breaking_characters(): void
+    {
+        // A tenant like "evil.com/" would change the request host in the base URL
+        // (https://{tenant}.weclapp.com/...) — must be rejected.
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('tenant');
+
+        new WeclappConfig(tenant: 'evil.com/', token: 'test-token');
+    }
+
+    public function test_throws_on_tenant_with_dot(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+
+        new WeclappConfig(tenant: 'my.tenant', token: 'test-token');
+    }
+
+    public function test_allows_tenant_with_hyphen(): void
+    {
+        $config = new WeclappConfig(tenant: 'my-tenant-2', token: 'test-token');
+
+        self::assertSame('https://my-tenant-2.weclapp.com/webapp/api/v2/', $config->getBaseUrl());
+    }
+
+    public function test_throws_on_invalid_version_format(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('version');
+
+        new WeclappConfig(tenant: 'miralsoft', token: 'test-token', version: 'v2/../admin');
+    }
+
     public function test_throws_on_zero_timeout(): void
     {
         $this->expectException(InvalidArgumentException::class);

@@ -26,7 +26,7 @@ final class PartyHabitualExporterLetterOfIntentDTO extends AbstractDTO
      * @param bool         $automaticallySuggestInInvoice   Whether to automatically suggest this letter in invoice creation.
      * @param int|null     $date                            Date of the letter of intent in epoch milliseconds.
      * @param bool         $fromSupplier                    Whether this letter was received from a supplier.
-     * @param array        $invoices                        List of linked invoice references (readOnly).
+     * @param list<array<string, mixed>> $invoices          List of linked invoice references (readOnly).
      * @param string|null  $numberDeclarer                  Declaration number from the declarer.
      * @param string|null  $numberSupplier                  Declaration number from the supplier.
      * @param string|null  $totalAmount                     Total covered amount as decimal string.

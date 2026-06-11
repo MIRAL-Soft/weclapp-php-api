@@ -34,6 +34,8 @@ use miralsoft\weclapp\api\Query\QueryBuilder;
  * @see \miralsoft\weclapp\api\DTO\NumberRangeDTO
  * @see \miralsoft\weclapp\api\Resource\NumberRangeValueResource
  * @see \miralsoft\weclapp\api\Enum\NumberRangeType
+ *
+ * @extends AbstractResource<\miralsoft\weclapp\api\DTO\NumberRangeDTO>
  */
 class NumberRangeResource extends AbstractResource
 {

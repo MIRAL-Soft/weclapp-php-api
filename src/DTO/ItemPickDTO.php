@@ -24,7 +24,7 @@ final class ItemPickDTO extends AbstractDTO
      * @param string|null $internalTransportReferenceId        ID of the internal transport reference.
      * @param string|null $orderItemId                         ID of the parent sales order item.
      * @param string|null $quantity                            Picked quantity as a decimal string.
-     * @param array       $serialNumbers                       List of serial numbers for the picked items.
+     * @param list<mixed> $serialNumbers                       List of serial numbers for the picked items.
      * @param string|null $sourceInternalTransportReferenceId  Source internal transport reference ID (readOnly).
      * @param string|null $sourceStoragePlaceId                Source storage place ID (readOnly).
      * @param string|null $storagePlaceId                      Target storage place ID.

@@ -13,6 +13,8 @@ use miralsoft\weclapp\api\Query\QueryBuilder;
  * Resource class for weclapp Article Category operations.
  *
  * Wraps the /api/v2/articleCategory endpoint.
+ *
+ * @extends AbstractResource<\miralsoft\weclapp\api\DTO\ArticleCategoryDTO>
  */
 class ArticleCategoryResource extends AbstractResource
 {

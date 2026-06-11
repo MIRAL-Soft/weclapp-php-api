@@ -28,8 +28,8 @@ final class CustomAttributeDTO extends AbstractDTO
      * @param string|null  $numberValue            Value for NUMBER/DECIMAL type attributes (decimal string).
      * @param string|null  $selectedValueId        Selected option ID for SELECT type attributes.
      * @param string|null  $stringValue            Value for TEXT/TEXTAREA type attributes.
-     * @param array        $entityReferences       List of referenced entity objects [{entityId, entityName}].
-     * @param array        $selectedValues         List of selected option objects [{id}] for MULTISELECT attributes.
+     * @param list<array<string, mixed>> $entityReferences  List of referenced entity objects [{entityId, entityName}].
+     * @param list<array<string, mixed>> $selectedValues    List of selected option objects [{id}] for MULTISELECT attributes.
      */
     public function __construct(
         public readonly ?string $attributeDefinitionId,
@@ -83,7 +83,7 @@ final class CustomAttributeDTO extends AbstractDTO
      * For LIST/MULTISELECT/ENTITY attributes use `selectedValueId`/`selectedValues`/
      * `entityReferences` explicitly.
      */
-    public function value(): string|int|bool|null
+    public function value(): string|int|bool
     {
         return match (true) {
             $this->stringValue     !== null => $this->stringValue,

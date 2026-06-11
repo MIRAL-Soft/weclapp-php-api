@@ -170,6 +170,8 @@ final class ResponseParser
     /**
      * Decode a JSON string into an associative array.
      *
+     * @return array<string, mixed>
+     *
      * @throws WeclappApiException If JSON is invalid.
      */
     private static function decodeJson(string $body, string $url = ''): array

@@ -149,6 +149,28 @@ class CustomerResourceTest extends TestCase
         self::assertTrue($result->hasMore);
     }
 
+    public function test_find_by_company_paginates_beyond_one_page(): void
+    {
+        // Regression test: findByCompany() previously used list() with the default
+        // pageSize of 50 and silently truncated larger result sets. It must now
+        // paginate through ALL pages (listAll, pageSize 1000).
+        $fullPage = array_map(
+            fn (int $i): array => $this->customerPayload('c' . $i, 'K-' . $i),
+            range(1, 1000)
+        );
+        $secondPage = [$this->customerPayload('c1001', 'K-1001')];
+
+        $client = $this->makeClient([
+            new Response(200, [], json_encode(['result' => $fullPage])),
+            new Response(200, [], json_encode(['result' => $secondPage])),
+        ]);
+
+        $result = $client->customers()->findByCompany('Acme');
+
+        self::assertCount(1001, $result);
+        self::assertSame('c1001', $result[1000]->id);
+    }
+
     // -------------------------------------------------------------------------
     // create()
     // -------------------------------------------------------------------------

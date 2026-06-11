@@ -19,6 +19,7 @@
     "psr/simple-cache": "^3.0"
   },
   "require-dev": {
+    "phpstan/phpstan": "^2.2",
     "phpunit/phpunit": "^11.0"
   },
   "autoload": {
@@ -30,6 +31,10 @@
     "psr-4": {
       "miralsoft\\weclapp\\api\\Tests\\": "tests/"
     }
+  },
+  "scripts": {
+    "test": "phpunit --testsuite Unit",
+    "analyse": "phpstan analyse"
   },
   "config": {
     "sort-packages": true,

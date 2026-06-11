@@ -32,6 +32,8 @@ use miralsoft\weclapp\api\Query\QueryBuilder;
  * foreach ($changed as $customer) {
  *     $externalSystem->syncCustomer($customer);
  * }
+ *
+ * @extends AbstractResource<\miralsoft\weclapp\api\DTO\CustomerDTO>
  */
 class CustomerResource extends AbstractResource
 {
@@ -81,14 +83,12 @@ class CustomerResource extends AbstractResource
      */
     public function findByCompany(string $company): array
     {
-        $result = $this->list(
+        /** @var list<CustomerDTO> */
+        return $this->listAll(
             QueryBuilder::new()
                 ->filterIlike('company', $company)
                 ->sort('company')
         );
-
-        /** @var list<CustomerDTO> */
-        return $result->items;
     }
 
     /**
@@ -105,25 +105,23 @@ class CustomerResource extends AbstractResource
      */
     public function findByName(string $name): array
     {
-        $byCompany = $this->list(
+        $byCompany = $this->listAll(
             QueryBuilder::new()
                 ->filterIlike('company', $name)
                 ->sort('company')
         );
 
-        if (!empty($byCompany->items)) {
+        if (!empty($byCompany)) {
             /** @var list<CustomerDTO> */
-            return $byCompany->items;
+            return $byCompany;
         }
 
-        $byPerson = $this->list(
+        /** @var list<CustomerDTO> */
+        return $this->listAll(
             QueryBuilder::new()
                 ->filterIlike('lastName', $name)
                 ->sort('lastName')
         );
-
-        /** @var list<CustomerDTO> */
-        return $byPerson->items;
     }
 
     /**
@@ -135,13 +133,11 @@ class CustomerResource extends AbstractResource
      */
     public function findByEmail(string $email): array
     {
-        $result = $this->list(
+        /** @var list<CustomerDTO> */
+        return $this->listAll(
             QueryBuilder::new()
                 ->filterEq('email', $email)
         );
-
-        /** @var list<CustomerDTO> */
-        return $result->items;
     }
 
     /**

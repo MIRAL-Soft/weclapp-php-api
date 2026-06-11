@@ -22,6 +22,8 @@ use DateTimeInterface;
  *     ->pageSize(50);
  *
  * // Produces: ?active-eq=1&company-ilike=acme&lastModifiedDate-gt=...&sort=company&page=1&pageSize=50
+ *
+ * @phpstan-consistent-constructor
  */
 class QueryBuilder
 {

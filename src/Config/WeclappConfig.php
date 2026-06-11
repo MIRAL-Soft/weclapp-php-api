@@ -54,8 +54,26 @@ final class WeclappConfig
         if (trim($tenant) === '') {
             throw new InvalidArgumentException('Weclapp tenant must not be empty.');
         }
+        // The tenant is interpolated into the base URL host (https://{tenant}.weclapp.com).
+        // Restricting it to subdomain-safe characters prevents a malformed tenant from
+        // redirecting requests to a different host (e.g. "evil.com/").
+        if (!preg_match('/^[a-z0-9][a-z0-9-]*$/i', $tenant)) {
+            throw new InvalidArgumentException(
+                sprintf(
+                    'Weclapp tenant "%s" is invalid: only letters, digits and hyphens are allowed '
+                    . '(the subdomain part of https://{tenant}.weclapp.com).',
+                    $tenant,
+                ),
+            );
+        }
         if (trim($token) === '') {
             throw new InvalidArgumentException('Weclapp API token must not be empty.');
+        }
+        // The version is interpolated into the URL path (…/webapp/api/{version}/).
+        if (!preg_match('/^v[0-9]+$/', $version)) {
+            throw new InvalidArgumentException(
+                sprintf('Weclapp API version "%s" is invalid: expected the form "v1", "v2", ….', $version),
+            );
         }
         if ($timeout < 1) {
             throw new InvalidArgumentException('HTTP timeout must be at least 1 second.');

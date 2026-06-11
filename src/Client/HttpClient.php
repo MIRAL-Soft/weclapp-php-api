@@ -200,8 +200,6 @@ final class HttpClient
             $this->logger->error('[weclapp] Request failed: {message}', ['message' => $e->getMessage()]);
             $this->handleRequestException($e, $url);
         }
-
-        return [];
     }
 
     /**
@@ -305,8 +303,6 @@ final class HttpClient
             $this->logger->error('[weclapp] Request failed: {message}', ['message' => $e->getMessage()]);
             $this->handleRequestException($e, $url);
         }
-
-        return [];
     }
 
     /**
@@ -351,7 +347,7 @@ final class HttpClient
     /**
      * Calculate elapsed time in milliseconds since an hrtime() start point.
      *
-     * @param array{0: int, 1: int}|int $start hrtime(true) nanosecond timestamp.
+     * @param int $start hrtime(true) nanosecond timestamp.
      */
     private function elapsed(int $start): int
     {

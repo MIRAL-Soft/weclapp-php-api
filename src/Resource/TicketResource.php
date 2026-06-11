@@ -16,6 +16,8 @@ use miralsoft\weclapp\api\Query\QueryBuilder;
  * contracts and sales orders.
  *
  * @see \miralsoft\weclapp\api\DTO\TicketDTO
+ *
+ * @extends AbstractResource<\miralsoft\weclapp\api\DTO\TicketDTO>
  */
 class TicketResource extends AbstractResource
 {

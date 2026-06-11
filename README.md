@@ -1416,6 +1416,19 @@ Unit tests use a Guzzle `MockHandler`. No network connection required, runs in ~
 ```bash
 php vendor/bin/phpunit --testsuite Unit
 # or just: php vendor/bin/phpunit
+# or: composer test
+```
+
+### Static Analysis (PHPStan, level 6)
+
+The non-legacy source tree is analysed with PHPStan at level 6 — including full
+generics plumbing (`@extends AbstractResource<XxxDTO>` on every resource, generic
+`PaginatedResultDTO<T>`), so IDEs and PHPStan infer precise DTO types from
+`list()`/`listAll()`/`find()` automatically:
+
+```bash
+composer analyse
+# or: php vendor/bin/phpstan analyse
 ```
 
 Inject a mock in your own code the same way:
@@ -1910,6 +1923,11 @@ Embedded in `SalesInvoiceDTO::$salesInvoiceItems`. Maps the `salesInvoiceItem` s
 
 Version 1 classes (`Customer`, `Article`, `SalesOrder`, etc.) are still present but
 marked `@deprecated`. They continue to work against the v1 API endpoint until you migrate.
+
+> **Runtime deprecation notice:** since the latest release, instantiating a legacy v1
+> class (or calling `APICall::call()`) triggers a silenced `E_USER_DEPRECATED` notice
+> so the legacy usage shows up in error logs / collectors. The classes will be
+> **removed in the next major version** — migrate to the v2 resources below.
 
 ```php
 // ❌ Old (v1, deprecated — API shuts down August 2025)

@@ -13,6 +13,8 @@ use miralsoft\weclapp\api\Query\QueryBuilder;
  * Resource class for weclapp Supplier operations.
  *
  * Wraps the /api/v2/party endpoint (filtered to records with a supplierNumber).
+ *
+ * @extends AbstractResource<\miralsoft\weclapp\api\DTO\SupplierDTO>
  */
 class SupplierResource extends AbstractResource
 {
@@ -36,14 +38,12 @@ class SupplierResource extends AbstractResource
      */
     public function findByCompany(string $company): array
     {
-        $result = $this->list(
+        /** @var list<SupplierDTO> */
+        return $this->listAll(
             QueryBuilder::new()
                 ->filterIlike('company', $company)
                 ->sort('company')
         );
-
-        /** @var list<SupplierDTO> */
-        return $result->items;
     }
 
     /**

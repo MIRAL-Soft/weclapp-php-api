@@ -21,6 +21,8 @@ use miralsoft\weclapp\api\Query\QueryBuilder;
  *
  * @see \miralsoft\weclapp\api\DTO\NumberRangeValueDTO
  * @see \miralsoft\weclapp\api\Resource\NumberRangeResource
+ *
+ * @extends AbstractResource<\miralsoft\weclapp\api\DTO\NumberRangeValueDTO>
  */
 class NumberRangeValueResource extends AbstractResource
 {

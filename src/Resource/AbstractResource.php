@@ -40,6 +40,8 @@ abstract class AbstractResource
     /**
      * Fully qualified class name of the DTO to hydrate responses into.
      *
+     * @var class-string<T>
+     *
      * @example \miralsoft\weclapp\api\DTO\CustomerDTO::class
      */
     protected string $dtoClass;
@@ -135,6 +137,25 @@ abstract class AbstractResource
     }
 
     /**
+     * Build the URL path segment for a single-record endpoint, with the ID
+     * safely URL-encoded.
+     *
+     * weclapp IDs are normally plain numeric strings, but IDs may originate from
+     * external input (webhook payloads, user-supplied references). Encoding
+     * prevents characters like `/`, `?`, `#` or `%` from redirecting the request
+     * to a different endpoint path or injecting query parameters.
+     *
+     * @param string $id     The weclapp record ID (raw, un-encoded).
+     * @param string $suffix Optional path suffix appended AFTER the encoded ID,
+     *                       e.g. '/downloadLatestSalesInvoicePdf'. Must be a
+     *                       trusted literal, never user input.
+     */
+    protected function idPath(string $id, string $suffix = ''): string
+    {
+        return $this->endpoint . '/id/' . rawurlencode($id) . $suffix;
+    }
+
+    /**
      * Returns the total number of records matching the optional filter query.
      *
      * @param QueryBuilder|null $query Optional filters (no pagination/sort needed).
@@ -164,7 +185,7 @@ abstract class AbstractResource
     public function find(string $id): AbstractDTO
     {
         $data = $this->rateLimiter->execute(
-            fn () => $this->http->get($this->endpoint . '/id/' . $id)
+            fn () => $this->http->get($this->idPath($id))
         );
 
         return ($this->dtoClass)::fromArray($data);
@@ -214,7 +235,7 @@ abstract class AbstractResource
     public function findRaw(string $id): array
     {
         return $this->rateLimiter->execute(
-            fn () => $this->http->get($this->endpoint . '/id/' . $id)
+            fn () => $this->http->get($this->idPath($id))
         );
     }
 
@@ -234,12 +255,19 @@ abstract class AbstractResource
         );
 
         $rawItems = ResponseParser::extractList($data);
+        // No explicit closure return type: with $dtoClass typed class-string<T>,
+        // PHPStan infers list<T> here, keeping PaginatedResultDTO generic.
         $items    = array_map(
-            fn (array $item): AbstractDTO => ($this->dtoClass)::fromArray($item),
+            fn (array $item) => ($this->dtoClass)::fromArray($item),
             $rawItems
         );
 
-        $total   = ResponseParser::extractTotalCount($data) ?? count($items);
+        $total = ResponseParser::extractTotalCount($data) ?? count($items);
+
+        // weclapp list responses carry no reliable total, so "more pages exist" can
+        // only be inferred from a full page. When the result count is an exact
+        // multiple of pageSize this costs one extra (empty) page request — the
+        // unavoidable trade-off without a separate count() round-trip.
         $hasMore = count($items) >= $q->getPageSize();
 
         return new PaginatedResultDTO(
@@ -332,7 +360,7 @@ abstract class AbstractResource
     public function update(string $id, array $data): AbstractDTO
     {
         $response = $this->rateLimiter->execute(
-            fn () => $this->http->put($this->endpoint . '/id/' . $id, $data, $this->dryRun)
+            fn () => $this->http->put($this->idPath($id), $data, $this->dryRun)
         );
 
         return ($this->dtoClass)::fromArray($response);
@@ -349,6 +377,12 @@ abstract class AbstractResource
      *
      * This means **all** existing field values are preserved; only the keys you
      * explicitly provide in `$fields` are changed.
+     *
+     * **Shallow merge:** values in `$fields` replace the raw value for that key
+     * *wholesale* — there is no deep merge. For nested structures (e.g.
+     * `customAttributes`, `orderItems`, address objects) you must pass the
+     * complete desired array for that key, or use the dedicated helpers
+     * (`setCustomAttribute()`, `addOrderItem()`, …) which handle the merge.
      *
      * **Optimistic locking** is handled automatically: the `version` obtained
      * from the GET response is always used. If another process modifies the
@@ -487,7 +521,7 @@ abstract class AbstractResource
     public function delete(string $id): void
     {
         $this->rateLimiter->execute(
-            fn () => $this->http->delete($this->endpoint . '/id/' . $id, $this->dryRun)
+            fn () => $this->http->delete($this->idPath($id), $this->dryRun)
         );
     }
 
@@ -572,6 +606,10 @@ abstract class AbstractResource
      *
      * Unlike listAll() which loads all pages into memory, cursor() yields
      * DTOs one by one while paginating lazily. Ideal for large datasets.
+     *
+     * Page size: when no $query is passed, cursor() paginates with pageSize 100.
+     * When a $query IS passed, its pageSize is used (QueryBuilder default: 50) —
+     * set ->pageSize(...) explicitly on the query to control the fetch size.
      *
      * @param QueryBuilder|null $query Optional filters and sort parameters.
      * @return \Generator<int, T>

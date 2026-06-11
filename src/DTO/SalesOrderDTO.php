@@ -33,7 +33,7 @@ final class SalesOrderDTO extends AbstractDTO
      * @param string|null $salesChannel                          Assigned sales channel.
      * @param string|null $commission                            Commission note or identifier.
      * @param string|null $commercialLanguage                    Commercial language code.
-     * @param string|null $currencyConversionDate                Date of currency conversion in epoch ms (readOnly).
+     * @param int|null    $currencyConversionDate                Date of currency conversion in epoch ms (readOnly).
      * @param bool        $currencyConversionLocked              True if the currency conversion rate is locked.
      * @param string|null $currencyConversionRate                Currency conversion rate as a decimal string.
      * @param string|null $recordCurrencyId                      ID of the document currency.

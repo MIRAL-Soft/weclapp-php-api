@@ -21,6 +21,8 @@ use miralsoft\weclapp\api\Query\QueryBuilder;
  * @example Resolve a partyId from an invoice:
  * $party = $client->parties()->find($invoice->partyId);
  * echo $party->customerNumber; // e.g. "K-10042"
+ *
+ * @extends AbstractResource<\miralsoft\weclapp\api\DTO\PartyDTO>
  */
 class PartyResource extends AbstractResource
 {

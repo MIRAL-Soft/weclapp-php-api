@@ -47,6 +47,19 @@ class NumberRangeValueDTOTest extends TestCase
         self::assertSame(4, $dto->length);
     }
 
+    public function test_sales_invoice_types_keep_zero_string_but_drop_empty(): void
+    {
+        $data = $this->sampleData();
+        $data['salesInvoiceTypes']      = ['STANDARD_INVOICE', '0', ''];
+        $data['creditNoteInvoiceTypes'] = ['', 'CREDIT_NOTE', '0'];
+
+        $dto = NumberRangeValueDTO::fromArray($data);
+
+        // "0" is a legitimate string value and must survive; only "" is dropped.
+        self::assertSame(['STANDARD_INVOICE', '0'], $dto->salesInvoiceTypes);
+        self::assertSame(['CREDIT_NOTE', '0'], $dto->creditNoteInvoiceTypes);
+    }
+
     public function test_prefix_and_suffix_are_null_when_absent(): void
     {
         $data = $this->sampleData();

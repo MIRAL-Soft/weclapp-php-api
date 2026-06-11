@@ -15,6 +15,8 @@ use miralsoft\weclapp\api\Query\QueryBuilder;
  *
  * Wraps the /api/v2/quotation endpoint.
  * Includes PDF download and conversion to sales order.
+ *
+ * @extends AbstractResource<\miralsoft\weclapp\api\DTO\QuotationDTO>
  */
 class QuotationResource extends AbstractResource
 {
@@ -33,7 +35,7 @@ class QuotationResource extends AbstractResource
     {
         return $this->rateLimiter->execute(
             fn () => $this->http->getBinary(
-                $this->endpoint . '/id/' . $id . '/downloadLatestQuotationPdf'
+                $this->idPath($id, '/downloadLatestQuotationPdf')
             )
         );
     }
@@ -53,7 +55,7 @@ class QuotationResource extends AbstractResource
     {
         $response = $this->rateLimiter->execute(
             fn () => $this->http->post(
-                $this->endpoint . '/id/' . $id . '/createSalesOrder',
+                $this->idPath($id, '/createSalesOrder'),
                 []
             )
         );

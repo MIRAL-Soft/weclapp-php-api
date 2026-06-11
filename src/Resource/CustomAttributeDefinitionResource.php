@@ -46,6 +46,8 @@ use miralsoft\weclapp\api\Util\ResponseParser;
  *
  * @see \miralsoft\weclapp\api\DTO\CustomAttributeDefinitionDTO
  * @see \miralsoft\weclapp\api\DTO\CustomAttributeDTO
+ *
+ * @extends AbstractResource<\miralsoft\weclapp\api\DTO\CustomAttributeDefinitionDTO>
  */
 class CustomAttributeDefinitionResource extends AbstractResource
 {

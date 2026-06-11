@@ -232,6 +232,8 @@ abstract class AbstractDTO
      * Returns null if the value is missing, null, or zero.
      * Epoch zero (1970-01-01) is treated as absent because weclapp never
      * uses it as a real business date — it indicates a field that was not set.
+     *
+     * @param array<string, mixed> $data
      */
     protected static function dateFromEpochMs(array $data, string $key): ?DateTimeImmutable
     {

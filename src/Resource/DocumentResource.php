@@ -39,6 +39,8 @@ use miralsoft\weclapp\api\Util\ResponseParser;
  *
  * @see \miralsoft\weclapp\api\DTO\DocumentDTO
  * @see \miralsoft\weclapp\api\Enum\DocumentType
+ *
+ * @extends AbstractResource<\miralsoft\weclapp\api\DTO\DocumentDTO>
  */
 class DocumentResource extends AbstractResource
 {
@@ -187,7 +189,7 @@ class DocumentResource extends AbstractResource
     {
         return $this->rateLimiter->execute(
             fn () => $this->http->getBinary(
-                $this->endpoint . '/id/' . rawurlencode($id) . '/download'
+                $this->idPath($id, '/download')
             )
         );
     }
@@ -326,7 +328,7 @@ class DocumentResource extends AbstractResource
 
         $response = $this->rateLimiter->execute(
             fn () => $this->http->postUpload(
-                $this->endpoint . '/id/' . rawurlencode($id) . '/upload',
+                $this->idPath($id, '/upload'),
                 $queryString,
                 $binary,
                 $contentType,
@@ -354,7 +356,7 @@ class DocumentResource extends AbstractResource
     public function find(string $id): DocumentDTO
     {
         $data = $this->rateLimiter->execute(
-            fn () => $this->http->get($this->endpoint . '/id/' . rawurlencode($id))
+            fn () => $this->http->get($this->idPath($id))
         );
 
         return DocumentDTO::fromArray($data);
@@ -372,7 +374,7 @@ class DocumentResource extends AbstractResource
     {
         $response = $this->rateLimiter->execute(
             fn () => $this->http->put(
-                $this->endpoint . '/id/' . rawurlencode($id),
+                $this->idPath($id),
                 $data,
             )
         );
@@ -388,7 +390,7 @@ class DocumentResource extends AbstractResource
     public function delete(string $id): void
     {
         $this->rateLimiter->execute(
-            fn () => $this->http->delete($this->endpoint . '/id/' . rawurlencode($id))
+            fn () => $this->http->delete($this->idPath($id))
         );
     }
 }

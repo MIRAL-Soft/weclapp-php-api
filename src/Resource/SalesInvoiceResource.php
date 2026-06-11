@@ -19,6 +19,8 @@ use Psr\SimpleCache\CacheInterface;
  * Wraps the /api/v2/salesInvoice endpoint.
  * Includes convenience methods for downloading cancellation invoice PDFs (credit notes)
  * via the /document endpoint.
+ *
+ * @extends AbstractResource<\miralsoft\weclapp\api\DTO\SalesInvoiceDTO>
  */
 class SalesInvoiceResource extends AbstractResource
 {
@@ -51,7 +53,7 @@ class SalesInvoiceResource extends AbstractResource
     {
         return $this->rateLimiter->execute(
             fn () => $this->http->getBinary(
-                $this->endpoint . '/id/' . $id . '/downloadLatestSalesInvoicePdf'
+                $this->idPath($id, '/downloadLatestSalesInvoicePdf')
             )
         );
     }
@@ -104,7 +106,7 @@ class SalesInvoiceResource extends AbstractResource
 
         try {
             $data  = $this->rateLimiter->execute(
-                fn () => $this->http->get('party/id/' . $partyId)
+                fn () => $this->http->get('party/id/' . rawurlencode($partyId))
             );
             $party = PartyDTO::fromArray($data);
             $this->partyCache[$partyId] = $party;

@@ -44,6 +44,8 @@ use miralsoft\weclapp\api\Query\QueryBuilder;
  *
  * @see \miralsoft\weclapp\api\DTO\RecurringInvoiceDTO
  * @see \miralsoft\weclapp\api\Enum\WebhookEntityName::RecurringInvoice
+ *
+ * @extends AbstractResource<\miralsoft\weclapp\api\DTO\RecurringInvoiceDTO>
  */
 class RecurringInvoiceResource extends AbstractResource
 {

@@ -26,7 +26,7 @@ final class SalesOrderPaymentDTO extends AbstractDTO
      * @param int|null    $dueDate          Payment due date in epoch milliseconds.
      * @param int         $positionNumber   Position within the payment schedule (readOnly).
      * @param string|null $salesInvoiceId   ID of the linked sales invoice (readOnly).
-     * @param array       $salesInvoices    List of linked sales invoice references [{id}].
+     * @param list<array<string, mixed>> $salesInvoices List of linked sales invoice references [{id}].
      */
     public function __construct(
         public readonly string  $id,

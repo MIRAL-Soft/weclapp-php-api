@@ -87,9 +87,11 @@ final class NumberRangeValueDTO extends AbstractDTO
             validToDate:          self::intOrNull($data, 'validToDate'),
             salesInvoiceTypes:    array_values(array_filter(
                 array_map('strval', self::arr($data, 'salesInvoiceTypes')),
+                static fn (string $v): bool => $v !== '',
             )),
             creditNoteInvoiceTypes: array_values(array_filter(
                 array_map('strval', self::arr($data, 'creditNoteInvoiceTypes')),
+                static fn (string $v): bool => $v !== '',
             )),
             salesChannels:        self::arr($data, 'salesChannels'),
             articleCategories:    self::arr($data, 'articleCategories'),
@@ -138,12 +140,12 @@ final class NumberRangeValueDTO extends AbstractDTO
     /**
      * Formats the next number this range would issue, based on lastValue + interval.
      *
-     * Returns null if no prefix is configured. The numeric part is zero-padded
-     * to $length digits when $length is set.
+     * Prefix and suffix are included when configured (empty string otherwise).
+     * The numeric part is zero-padded to $length digits when $length is set.
      *
      * @example "PR-0042", "RE-10043"
      */
-    public function formatNextNumber(): ?string
+    public function formatNextNumber(): string
     {
         $next   = $this->lastValue + $this->interval;
         $numStr = $this->length !== null

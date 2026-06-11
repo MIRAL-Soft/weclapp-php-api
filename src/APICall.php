@@ -24,6 +24,12 @@ class APICall
      */
     public static function call(string $function, array $data = array(), bool $post = false): string
     {
+        @trigger_error(
+            'APICall targets the legacy weclapp API v1 and is deprecated since 2.0; '
+            . 'use \miralsoft\weclapp\api\Client\HttpClient via WeclappClient instead.',
+            E_USER_DEPRECATED,
+        );
+
         self::prepareCall($function, $data, $post);
 
         // Get the result of curl

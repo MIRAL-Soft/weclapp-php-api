@@ -15,6 +15,8 @@ use miralsoft\weclapp\api\Query\QueryBuilder;
  *
  * Wraps the /api/v2/salesOrder endpoint.
  * Includes PDF download and delivery creation capabilities.
+ *
+ * @extends AbstractResource<\miralsoft\weclapp\api\DTO\SalesOrderDTO>
  */
 class SalesOrderResource extends AbstractResource
 {
@@ -33,7 +35,7 @@ class SalesOrderResource extends AbstractResource
     {
         return $this->rateLimiter->execute(
             fn () => $this->http->getBinary(
-                $this->endpoint . '/id/' . $id . '/downloadLatestOrderConfirmationPdf'
+                $this->idPath($id, '/downloadLatestOrderConfirmationPdf')
             )
         );
     }

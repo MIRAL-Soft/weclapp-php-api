@@ -19,6 +19,8 @@ use miralsoft\weclapp\api\Query\QueryBuilder;
  * via the download methods on this resource.
  *
  * @see \miralsoft\weclapp\api\DTO\ShipmentDTO
+ *
+ * @extends AbstractResource<\miralsoft\weclapp\api\DTO\ShipmentDTO>
  */
 class ShipmentResource extends AbstractResource
 {
@@ -124,7 +126,7 @@ class ShipmentResource extends AbstractResource
     {
         return $this->rateLimiter->execute(
             fn () => $this->http->getBinary(
-                $this->endpoint . '/id/' . $id . '/downloadLatestDeliveryNotePdf'
+                $this->idPath($id, '/downloadLatestDeliveryNotePdf')
             )
         );
     }
@@ -141,7 +143,7 @@ class ShipmentResource extends AbstractResource
     {
         return $this->rateLimiter->execute(
             fn () => $this->http->getBinary(
-                $this->endpoint . '/id/' . $id . '/downloadLatestPickingListPdf'
+                $this->idPath($id, '/downloadLatestPickingListPdf')
             )
         );
     }
@@ -158,7 +160,7 @@ class ShipmentResource extends AbstractResource
     {
         return $this->rateLimiter->execute(
             fn () => $this->http->getBinary(
-                $this->endpoint . '/id/' . $id . '/downloadLatestShippingLabelPdf'
+                $this->idPath($id, '/downloadLatestShippingLabelPdf')
             )
         );
     }

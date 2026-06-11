@@ -16,6 +16,8 @@ use miralsoft\weclapp\api\Query\QueryBuilder;
  * on delivery and to purchase invoices for payment.
  *
  * @see \miralsoft\weclapp\api\DTO\PurchaseOrderDTO
+ *
+ * @extends AbstractResource<\miralsoft\weclapp\api\DTO\PurchaseOrderDTO>
  */
 class PurchaseOrderResource extends AbstractResource
 {
@@ -121,7 +123,7 @@ class PurchaseOrderResource extends AbstractResource
     {
         return $this->rateLimiter->execute(
             fn () => $this->http->getBinary(
-                $this->endpoint . '/id/' . $id . '/downloadLatestPurchaseOrderPdf'
+                $this->idPath($id, '/downloadLatestPurchaseOrderPdf')
             )
         );
     }
@@ -138,7 +140,7 @@ class PurchaseOrderResource extends AbstractResource
     {
         return $this->rateLimiter->execute(
             fn () => $this->http->getBinary(
-                $this->endpoint . '/id/' . $id . '/downloadLatestCancellationSlipPdf'
+                $this->idPath($id, '/downloadLatestCancellationSlipPdf')
             )
         );
     }

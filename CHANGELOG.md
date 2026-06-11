@@ -7,6 +7,86 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased] — Branch `WeclappAPIv2`
 
+### Security & code-quality hardening (full-code review)
+
+A complete security/bug/best-practice review of the library was performed and all
+findings were fixed. **362 unit tests green, PHPStan level 6 clean.**
+
+#### Fixed — `findBy*` methods silently capped results at 50 records ⚠️
+
+`CustomerResource::findByCompany()/findByName()/findByEmail()`,
+`ContactResource::findByEmail()/findByCustomer()` and
+`SupplierResource::findByCompany()` used `list()` with the default page size (50)
+while being documented as "returns all matching". Result sets with more than 50
+matches were **silently truncated**. All six methods now use `listAll()` and
+paginate through every page. Regression test included (1001-record scenario).
+
+#### Security — record IDs are now URL-encoded in all request paths
+
+New central `AbstractResource::idPath($id, $suffix)` helper applies
+`rawurlencode()` to every record ID placed in a URL path — covering
+`find()`/`findRaw()`/`update()`/`delete()`, all PDF download endpoints
+(salesOrder, salesInvoice, quotation, shipment ×3, purchaseOrder ×2),
+`QuotationResource::convertToSalesOrder()` and the internal party lookup.
+Previously only `DocumentResource` encoded its IDs. Without encoding, an ID
+containing `/`, `?` or `%` (e.g. from a webhook payload or user input) could
+redirect the request to a different endpoint path or inject query parameters.
+6 new unit tests assert the encoding (path traversal, query injection, suffix
+preservation).
+
+#### Security — `WeclappConfig` validates tenant and version format
+
+`tenant` is interpolated into the request host
+(`https://{tenant}.weclapp.com/…`); it is now restricted to subdomain-safe
+characters (`[a-z0-9-]`), so a value like `evil.com/` can no longer change the
+host. `version` must match `v<digits>`. Defense-in-depth — both values normally
+come from trusted configuration.
+
+#### Fixed — `NumberRangeValueDTO` dropped legitimate `"0"` entries
+
+`salesInvoiceTypes`/`creditNoteInvoiceTypes` used bare `array_filter()`, which
+removes every falsy value including the string `"0"`. Now only empty strings are
+dropped (explicit `!== ''` callback).
+
+#### Fixed — stale docblocks / return types
+
+- `NumberRangeValueDTO::formatNextNumber()` claimed to return null ("if no prefix
+  configured") but never does — return type corrected to `string`.
+- `SalesOrderDTO::$currencyConversionDate` docblock said `string|null`; the
+  property is `int|null` (epoch ms).
+- `CustomAttributeDTO::value()` return type narrowed to `string|int|bool`
+  (never returns null; the nullable wrapper is `getCustomAttributeValue()`).
+- `AbstractResource::patch()` now documents the **shallow merge** semantics:
+  nested structures (customAttributes, orderItems, …) are replaced wholesale,
+  not deep-merged — use the dedicated helpers for nested edits.
+- `cursor()` documents that the pageSize-100 default only applies when no
+  QueryBuilder is passed.
+- Removed unreachable `return [];` statements in `HttpClient` (dead code after
+  always-throwing exception handlers).
+
+#### Changed — legacy v1 classes emit `E_USER_DEPRECATED`
+
+The deprecated v1 classes (`APICall`, `WeclappAPICall` and its subclasses
+`Article`, `Customer`, `SalesInvoice`, `SalesOrder`, …) now trigger a silenced
+`E_USER_DEPRECATED` notice on use, so consumers notice the legacy path at
+runtime. They remain functional and will be removed in the next major version.
+
+#### Changed — `WebhookResource::deactivate()` timestamp
+
+Now uses `format('Uv')` (pure integer epoch-ms) instead of
+`microtime(true) * 1000` float arithmetic — consistent with
+`QueryBuilder::toEpochMs()`.
+
+#### Added — PHPStan level 6 static analysis
+
+`phpstan/phpstan` added as dev dependency with `phpstan.neon` (level 6, all
+non-legacy source paths). All 41 initial findings fixed, including full generics
+plumbing: every concrete resource is annotated with
+`@extends AbstractResource<XxxDTO>`, `PaginatedResultDTO` is properly generic
+(`list<T> $items`), and `$dtoClass` is typed `class-string<T>` — IDEs and PHPStan
+now infer precise DTO types from `list()`/`listAll()`/`find()` without manual
+`@var` hints. Run with `composer analyse`.
+
 ### Added — RecurringInvoiceResource (read-only, `/api/v2/recurringInvoice`)
 
 Wraps weclapp's **recurring invoice** (wiederkehrende Rechnung) entity — the

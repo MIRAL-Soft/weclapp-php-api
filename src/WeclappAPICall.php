@@ -25,6 +25,18 @@ abstract class WeclappAPICall
      */
     public function __construct()
     {
+        // Surface the deprecation at runtime so consumers notice the legacy v1
+        // path is still in use. E_USER_DEPRECATED is non-fatal and suppressed in
+        // most production error_reporting configurations.
+        @trigger_error(
+            sprintf(
+                '%s targets the legacy weclapp API v1 and is deprecated since 2.0; '
+                . 'use \miralsoft\weclapp\api\Client\WeclappClient with the v2 resources instead.',
+                static::class,
+            ),
+            E_USER_DEPRECATED,
+        );
+
         $reflect = new ReflectionClass($this);
         $this->mainFunction = lcfirst($reflect->getShortName()) . '/';
     }

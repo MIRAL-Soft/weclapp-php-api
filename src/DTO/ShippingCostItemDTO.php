@@ -34,7 +34,7 @@ final class ShippingCostItemDTO extends AbstractDTO
      * @param string|null                  $unitCostInCompanyCurrency       Unit cost in company currency (readOnly).
      * @param string|null                  $unitPrice                       Sales price per unit as a decimal string.
      * @param string|null                  $unitPriceInCompanyCurrency      Unit price in company currency (readOnly).
-     * @param array                        $ecommerceOrderItemIds           Linked e-commerce order item IDs (salesOrder only).
+     * @param list<mixed>                  $ecommerceOrderItemIds           Linked e-commerce order item IDs (salesOrder only).
      * @param list<ReductionAdditionItemDTO> $reductionAdditionItems        Surcharge / discount breakdown sub-items.
      */
     public function __construct(
