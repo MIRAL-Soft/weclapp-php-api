@@ -550,3 +550,6 @@ local.properties
 # Project CLI scripts (exception to the Eclipse bin/ build-output rule above)
 !/bin/
 !/bin/**
+
+##### JetBrains IDE — ganzer Ordner ist maschinenspezifisch
+/.idea/
