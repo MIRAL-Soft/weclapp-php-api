@@ -71,24 +71,29 @@ weclapp schema — **every call failed with HTTP 400** since the method was
 introduced. Now filters on `paymentStatus = OPEN` (live-verified: 314 open
 invoices). New `PaymentStatus` enum with all 6 schema values.
 
-### Added — automated OpenAPI spec refresh
+### Added — OpenAPI spec refresh tool (local-only, no cloud token)
 
 - `bin/update-openapi-spec.php` (+ `composer spec:update`) downloads the current
   tenant spec from `https://{tenant}.weclapp.com/webapp/api/v2/meta/openapi.json`
   (credentials from env or `tests/.env.test`), validates it and overwrites
   `openapi_v2.json`. The spec file is now **tracked in git**.
-- `.github/workflows/update-openapi-spec.yml` runs the refresh weekly (Mondays
-  05:30 UTC, manual trigger possible) and commits only on change. Requires the
-  repository secrets `WECLAPP_TENANT` / `WECLAPP_TOKEN`.
+- **Deliberately local only.** An earlier automated GitHub workflow for this was
+  removed: weclapp tokens cannot be scoped to read-only (rights are per user, and
+  each extra weclapp user costs a licence), so storing a write-capable token in a
+  GitHub secret is not worth the risk. The spec is refreshed on demand with
+  `composer spec:update`, keeping the token on the developer machine.
 - Note: the tenant meta spec only lists licence-enabled endpoints (~450 paths)
   and misses some live endpoints entirely (e.g. `/recurringInvoice`) — it is a
   reference, not complete truth.
 
-### Added — GitHub Actions CI
+### Added — GitHub Actions CI (token-free)
 
 `.github/workflows/ci.yml` runs the unit tests and PHPStan (level 6) on PHP 8.3
-and 8.4 for every push and pull request — no credentials required (unit tests
-are fully mocked). Setup guide: `docs/CI-SETUP.md`.
+and 8.4 for every push and pull request. **No weclapp token, no secrets, no
+elevated workflow permissions required** — the unit tests are fully mocked and
+the CI needs only default read access (works under a restrictive org policy).
+The integration tests run locally only and never in CI. Setup guide:
+`docs/CI-SETUP.md`.
 
 ### Added — webhook signature verification task for consumers
 

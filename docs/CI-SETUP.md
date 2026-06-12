@@ -1,8 +1,25 @@
 # CI-Einrichtung (GitHub Actions)
 
 Diese Anleitung beschreibt, wie die CI für `miralsoft/weclapp-php-api` auf GitHub
-aktiviert wird. Die Workflow-Dateien liegen bereits im Repository — es ist nur
-einmalige Konfiguration auf GitHub nötig.
+aktiviert wird. Die Workflow-Datei liegt bereits im Repository — es ist nur
+minimale Konfiguration auf GitHub nötig.
+
+## Bewusste Entscheidung: kein weclapp-Token in der CI
+
+Die CI verwendet **kein weclapp-Token**. Grund: weclapp-Tokens sind nicht auf
+„nur lesen" einschränkbar (die Rechte hängen am Benutzer, und jeder zusätzliche
+weclapp-Benutzer kostet Lizenz). Ein schreibfähiges Token in einem
+GitHub-Secret abzulegen ist das Risiko nicht wert. Sicherheit geht hier vor
+Komfort.
+
+Konsequenz:
+- Die **Test-CI** läuft vollständig **ohne Token** (alle Unit-Tests sind gegen
+  Guzzle-Mocks ausgeführt, kein Netzwerkzugriff).
+- Die **OpenAPI-Spec** wird **nicht** automatisch in der Cloud aktualisiert,
+  sondern **lokal bei Bedarf** mit `composer spec:update` — dabei bleibt dein
+  persönliches Token auf deinem Rechner und verlässt ihn nie.
+- Die **Integrationstests** laufen ebenfalls nur lokal (sie brauchen einen echten
+  Tenant) und **nie** in der CI.
 
 ## Was die CI tut
 
@@ -11,73 +28,23 @@ einmalige Konfiguration auf GitHub nötig.
 2. Statische Analyse (`phpstan analyse`, Level 6)
 
 Schlägt einer der Schritte fehl, wird der Commit/PR rot markiert.
-Es werden **keine Credentials** benötigt — die Unit-Tests laufen vollständig
-gegen Guzzle-Mocks, ohne Netzwerkzugriff.
+**Keine Credentials, keine Secrets, keine besonderen Berechtigungen nötig** — die
+Standard-Leserechte (auch unter restriktiver Org-Policy) genügen.
 
-**`.github/workflows/update-openapi-spec.yml`** — hält `openapi_v2.json` aktuell:
-- Läuft jeden Montag 05:30 UTC (und manuell per Knopfdruck)
-- Lädt die aktuelle Spec von `https://{tenant}.weclapp.com/webapp/api/v2/meta/openapi.json`
-- Committet die Datei nur, wenn sie sich geändert hat
+## Einrichtung auf GitHub
 
-## Einmalige Einrichtung auf GitHub
+### Schritt 1 — Workflow auf GitHub bringen
+Die Datei `.github/workflows/ci.yml` muss auf GitHub liegen (ist in diesem Branch
+enthalten). Nach dem Push erscheint im Repository der Tab **Actions** und die CI
+läuft ab dem nächsten Push automatisch.
 
-### Schritt 1 — Workflows pushen
-Die beiden Dateien unter `.github/workflows/` müssen auf GitHub liegen
-(sind in diesem Branch enthalten). Nach dem Push erscheint im Repository der
-Tab **Actions**.
+> Hinweis: `ci.yml` nutzt `on: push` und läuft daher auf **jedem** Branch — auch
+> bevor `WeclappAPIv2` nach `main` gemergt ist.
 
-### Schritt 2 — Secrets für den Spec-Updater anlegen
-Nur für den wöchentlichen Spec-Download nötig (die Test-CI braucht keine Secrets):
-
-1. Auf GitHub: **Settings → Secrets and variables → Actions → New repository secret**
-2. Zwei Secrets anlegen:
-   | Name | Wert |
-   |---|---|
-   | `WECLAPP_TENANT` | `miralsoft` |
-   | `WECLAPP_TOKEN` | API-Token (weclapp → Einstellungen → API) |
-
-> Empfehlung: dafür einen eigenen, **rein lesenden** API-Benutzer in weclapp
-> anlegen — der Spec-Download braucht keine Schreibrechte.
-
-### Schritt 3 — Schreibrechte für den Spec-Updater (nur für den Auto-Push)
-
-> Betrifft **ausschließlich** den optionalen Spec-Updater. Die Test-CI (`ci.yml`)
-> braucht nur Leserechte und läuft ohne diesen Schritt. Wer den Auto-Push der
-> Spec nicht braucht, kann Schritt 3 überspringen und die Spec stattdessen lokal
-> mit `composer spec:update` aktualisieren.
-
-Der Updater committet die aktualisierte `openapi_v2.json` zurück ins Repo, dazu
-braucht das `GITHUB_TOKEN` Schreibrechte. Der Workflow fordert sie bereits an
-(`permissions: contents: write`), **aber** eine Organisations-Policy kann das
-hart auf „read" begrenzen.
-
-**Symptom:** Unter **Repo → Settings → Actions → General → Workflow permissions**
-ist „Read and write permissions" ausgegraut und nicht wählbar. Das heißt: die
-Organisation (`MIRAL-Soft`) erzwingt read-only, und das Repo darf nicht erhöhen —
-der `permissions:`-Block im Workflow greift dann nicht, der Push scheitert mit
-HTTP 403.
-
-**Lösung — als Organisations-Admin** (nicht im Repo, sondern in den Org-Settings):
-
-1. `https://github.com/organizations/MIRAL-Soft/settings/actions` öffnen
-   (oder: GitHub → Organisation `MIRAL-Soft` → **Settings → Actions → General**)
-2. Sektion **„Workflow permissions"**
-3. **„Read and write permissions"** wählen → **Save**
-
-Danach ist die Einstellung im Repo nicht mehr ausgegraut und der Spec-Updater
-kann pushen. Der bestehende Workflow muss **nicht** geändert werden.
-
-> **Sicherheitshinweis:** „Read and write" gilt dann für alle Workflows der
-> Organisation. Da unser Workflow `permissions: contents: write` bereits explizit
-> setzt, ist das vertretbar, aber org-weit. Wer das enger halten will, nutzt
-> stattdessen einen **Deploy Key** (separater Schlüssel nur für dieses Repo, umgeht
-> die Org-Policy komplett) — sag Bescheid, dann wird der Workflow darauf umgestellt.
-
-### Schritt 4 — Funktionstest
-1. **Test-CI:** irgendeinen Commit pushen → Tab **Actions** → Workflow „CI" muss grün werden.
-2. **Spec-Updater:** Tab **Actions** → „Update OpenAPI Spec" → **Run workflow** →
-   nach ~1 Minute prüfen, ob der Lauf grün ist. Wenn sich die Spec geändert hat,
-   erscheint ein Commit `chore: update weclapp OpenAPI spec`.
+### Schritt 2 — Funktionstest
+Irgendeinen Commit pushen → Tab **Actions** → Workflow „CI" muss grün werden
+(~25 s). Per Klick auf einen Lauf siehst du die einzelnen Schritte (Tests 8.3,
+Tests 8.4, PHPStan).
 
 ### Optional — Branch-Schutz
 Unter **Settings → Branches → Add branch ruleset** für `main` (und ggf. `WeclappAPIv2`):
@@ -85,17 +52,42 @@ Unter **Settings → Branches → Add branch ruleset** für `main` (und ggf. `We
 
 Damit kann nichts gemergt werden, was Tests oder PHPStan bricht.
 
-## Lokal dieselben Checks ausführen
+## OpenAPI-Spec lokal aktualisieren
+
+Da die Spec nicht automatisch aktualisiert wird, bei Bedarf manuell:
+
+```bash
+composer spec:update
+```
+
+Lädt die aktuelle Spec von
+`https://{tenant}.weclapp.com/webapp/api/v2/meta/openapi.json` (Credentials aus
+`tests/.env.test` oder den Umgebungsvariablen), validiert sie und überschreibt
+`openapi_v2.json`. Anschließend die Änderung normal committen, falls sich etwas
+geändert hat. Empfehlung: ab und zu laufen lassen (z. B. vor größeren Änderungen
+an Resources/DTOs), damit die lokale Referenz nicht veraltet.
+
+## Lokal dieselben Checks wie die CI ausführen
 
 ```bash
 composer test          # Unit-Tests
 composer analyse       # PHPStan Level 6
-composer spec:update   # OpenAPI-Spec aktualisieren (braucht tests/.env.test)
 ```
 
 Unter Laragon mit PHP 8.3:
 ```bash
 C:\laragon\bin\php\php-8.3.30-Win32-vs16-x64\php.exe vendor\bin\phpunit --testsuite Unit
+```
+
+## Integrationstests (nur lokal, optional)
+
+Brauchen einen echten Tenant und ein Token in `tests/.env.test` (gitignored).
+Sie laufen **nie** in der CI. Write-Tests sind zusätzlich hinter
+`WECLAPP_ALLOW_WRITES=true` gated und räumen via try/finally hinter sich auf.
+
+```bash
+php vendor/bin/phpunit --testsuite Integration   # read-only
+WECLAPP_ALLOW_WRITES=true php vendor/bin/phpunit --testsuite Write
 ```
 
 ## Hinweise
