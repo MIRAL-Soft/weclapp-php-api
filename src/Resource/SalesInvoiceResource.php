@@ -12,6 +12,7 @@ use miralsoft\weclapp\api\Enum\PaymentStatus;
 use miralsoft\weclapp\api\Enum\SalesInvoiceType;
 use miralsoft\weclapp\api\Exception\WeclappApiException;
 use miralsoft\weclapp\api\Query\QueryBuilder;
+use miralsoft\weclapp\api\Util\WebUrlBuilder;
 use Psr\SimpleCache\CacheInterface;
 
 /**
@@ -40,6 +41,25 @@ class SalesInvoiceResource extends AbstractResource
     ) {
         parent::__construct($http, $rateLimiter, $cache);
         $this->documentResource = new DocumentResource($http, $rateLimiter, $cache);
+    }
+
+    /**
+     * Build the browser (web UI) detail-page URL for a sales invoice.
+     *
+     * Pure URL builder — no HTTP call, no auth. Useful for storing a clickable
+     * cross-link in an external system.
+     *
+     * @param string $id The weclapp sales invoice id (`SalesInvoiceDTO::id`).
+     * @return string e.g. "https://miralsoft.weclapp.com/app/sales-invoice/1000372"
+     *
+     * @throws \InvalidArgumentException If $id is empty.
+     *
+     * @example
+     * $url = $client->salesInvoices()->webUrl($invoice->id);
+     */
+    public function webUrl(string $id): string
+    {
+        return WebUrlBuilder::build($this->http->getWebBaseUrl(), 'salesInvoice', $id);
     }
 
     /**

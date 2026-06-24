@@ -25,6 +25,7 @@ use miralsoft\weclapp\api\Resource\ShipmentResource;
 use miralsoft\weclapp\api\Resource\SupplierResource;
 use miralsoft\weclapp\api\Resource\TicketResource;
 use miralsoft\weclapp\api\Resource\WebhookResource;
+use miralsoft\weclapp\api\Util\WebUrlBuilder;
 use Psr\Log\LoggerInterface;
 use Psr\SimpleCache\CacheInterface;
 
@@ -427,5 +428,32 @@ final class WeclappClient
     public function recurringInvoices(): RecurringInvoiceResource
     {
         return new RecurringInvoiceResource($this->http, $this->rateLimiter, $this->cache);
+    }
+
+    /**
+     * Build the canonical browser (web UI) deep link for an entity.
+     *
+     * Pure URL builder — no HTTP call, no auth parameters. Produces the link
+     * that opens the entity's detail page in the weclapp web UI, e.g. to store
+     * a clickable cross-link in an external system.
+     *
+     * Format: `https://{tenant}.weclapp.com/app/{segment}/{id}` (verified live).
+     *
+     * Typed convenience wrappers exist on the resources
+     * (`salesOrders()->webUrl($id)`, `salesInvoices()->webUrl($id)`).
+     *
+     * @param string $entityName API entity name, e.g. "salesOrder", "salesInvoice".
+     *                          See WebUrlBuilder::supportedEntities() for the list.
+     * @param string $id         The weclapp entity id (the DTO `id`).
+     *
+     * @throws \InvalidArgumentException If the entity name is unsupported or the id is empty.
+     *
+     * @example
+     * $url = $client->webUrl('salesOrder', $order->id);
+     * // "https://miralsoft.weclapp.com/app/sales-order/488081"
+     */
+    public function webUrl(string $entityName, string $id): string
+    {
+        return WebUrlBuilder::build($this->http->getWebBaseUrl(), $entityName, $id);
     }
 }

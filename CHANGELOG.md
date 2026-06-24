@@ -7,6 +7,50 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased] — Branch `WeclappAPIv2`
 
+### Added — Web UI deep-link builder (browser URLs for entities)
+
+Build the canonical browser detail-page URL for a weclapp entity — e.g. to store
+a clickable cross-link in an external system (mirrors Docbee's `webLink`). Pure
+URL builder: no HTTP call, no auth parameters in the URL.
+
+**URL format (verified live against the miralsoft tenant, 2026-06-12):**
+```
+https://{tenant}.weclapp.com/app/{segment}/{id}
+```
+Confirmed by opening the pages in a logged-in browser and matching the URL id
+against the API `id`:
+- `salesInvoice` RE28655 → `/app/sales-invoice/1000372` (DTO id 1000372 ✓)
+- `salesOrder` 4361 → `/app/sales-order/488081` (DTO id 488081 ✓)
+
+> The weclapp **API does not expose a deep-link/url field** for salesOrder or
+> salesInvoice (checked in the spec and live on full records — no url/link value
+> anywhere). The only URL fields in the schema are `quotation.publicLink` (a
+> public customer-facing accept link) and `shippingCarrier.trackingUrl`, neither
+> of which is an internal detail-page link. The URL therefore has to be built
+> client-side; this builder does it from the tenant + a verified path mapping.
+
+**New / changed:**
+- `WeclappConfig::getWebBaseUrl(): string` → `https://{tenant}.weclapp.com/`
+- `src/Util/WebUrlBuilder.php` — central, explicit `entityName → /app/ segment`
+  allow-list (currently `salesOrder` → `sales-order`, `salesInvoice` →
+  `sales-invoice`), easily extended with segments verified the same way.
+  `isSupported()` / `supportedEntities()` helpers.
+- `WeclappClient::webUrl(string $entityName, string $id): string` — generic
+- `SalesOrderResource::webUrl(string $id)` / `SalesInvoiceResource::webUrl(string $id)`
+  — typed convenience wrappers
+
+```php
+$client->salesOrders()->webUrl($order->id);     // https://…/app/sales-order/488081
+$client->salesInvoices()->webUrl($invoice->id); // https://…/app/sales-invoice/1000372
+$client->webUrl('salesOrder', $id);             // generic
+```
+
+**Error semantics:** unknown entity name or empty id → `InvalidArgumentException`
+(consistent with the rest of the library; avoids producing broken links silently).
+The id is the weclapp entity id (`SalesOrderDTO::id` / `SalesInvoiceDTO::id`) and
+is URL-encoded. 14 new unit tests; live-verified the generated links match the
+real browser URLs.
+
 ### Removed — WebhookValidator (claimed a signature weclapp never sends)
 
 The open contradiction around webhook signing is **settled by logging a real

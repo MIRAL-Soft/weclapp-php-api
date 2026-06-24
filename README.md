@@ -1050,6 +1050,45 @@ $all = $webhooks->all();
 
 ---
 
+## Web UI Deep Links
+
+Build the canonical **browser** detail-page URL for an entity — e.g. to store a
+clickable cross-link in another system. Pure URL builder: no HTTP call, no auth
+parameters.
+
+```php
+$client->salesOrders()->webUrl($order->id);     // https://{tenant}.weclapp.com/app/sales-order/488081
+$client->salesInvoices()->webUrl($invoice->id); // https://{tenant}.weclapp.com/app/sales-invoice/1000372
+
+// Generic form
+$client->webUrl('salesOrder', $id);
+
+// The web base itself is on the config:
+$config->getWebBaseUrl(); // https://{tenant}.weclapp.com/
+```
+
+The `{id}` is the weclapp entity id (`SalesOrderDTO::id` / `SalesInvoiceDTO::id`) —
+the same number that appears in the browser address bar. Verified live against the
+weclapp UI.
+
+> **Why not from the API?** weclapp's API exposes **no** deep-link/url field for
+> salesOrder or salesInvoice (verified in the spec and on full live records). The
+> link is therefore built client-side from the tenant + a verified path mapping.
+
+**Supported entities:** `salesOrder`, `salesInvoice` (the mapping in
+`WebUrlBuilder` is an explicit allow-list — extend it only with UI segments
+verified against the real frontend). An unknown entity name or empty id throws
+`InvalidArgumentException`:
+
+```php
+use miralsoft\weclapp\api\Util\WebUrlBuilder;
+
+WebUrlBuilder::supportedEntities();        // ['salesOrder', 'salesInvoice']
+WebUrlBuilder::isSupported('article');     // false
+```
+
+---
+
 ## Error Handling
 
 All errors throw typed exceptions. Catch `WeclappApiException` for a single catch-all,

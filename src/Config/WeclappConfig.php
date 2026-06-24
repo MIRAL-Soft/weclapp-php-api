@@ -209,6 +209,24 @@ final class WeclappConfig
     }
 
     /**
+     * Builds the browser (web UI) base URL for this tenant.
+     *
+     * This is the host root of the weclapp web application — the detail-page
+     * deep links live under `/app/...` below it. Unlike getBaseUrl() (the REST
+     * API base) this is meant for human-clickable browser links, not API calls.
+     *
+     * Format: https://{tenant}.weclapp.com/
+     *
+     * @see \miralsoft\weclapp\api\Util\WebUrlBuilder
+     *
+     * @example "https://miralsoft.weclapp.com/"
+     */
+    public function getWebBaseUrl(): string
+    {
+        return sprintf('https://%s.weclapp.com/', $this->tenant);
+    }
+
+    /**
      * Prevent token from being exposed in var_dump / print_r output.
      *
      * @return array<string, mixed>

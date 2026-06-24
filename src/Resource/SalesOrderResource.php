@@ -9,6 +9,7 @@ use miralsoft\weclapp\api\Exception\NotFoundException;
 use miralsoft\weclapp\api\Exception\OptimisticLockException;
 use miralsoft\weclapp\api\Exception\WeclappApiException;
 use miralsoft\weclapp\api\Query\QueryBuilder;
+use miralsoft\weclapp\api\Util\WebUrlBuilder;
 
 /**
  * Resource class for weclapp Sales Order operations.
@@ -22,6 +23,25 @@ class SalesOrderResource extends AbstractResource
 {
     protected string $endpoint = 'salesOrder';
     protected string $dtoClass = SalesOrderDTO::class;
+
+    /**
+     * Build the browser (web UI) detail-page URL for a sales order.
+     *
+     * Pure URL builder — no HTTP call, no auth. Useful for storing a clickable
+     * cross-link in an external system.
+     *
+     * @param string $id The weclapp sales order id (`SalesOrderDTO::id`).
+     * @return string e.g. "https://miralsoft.weclapp.com/app/sales-order/488081"
+     *
+     * @throws \InvalidArgumentException If $id is empty.
+     *
+     * @example
+     * $url = $client->salesOrders()->webUrl($order->id);
+     */
+    public function webUrl(string $id): string
+    {
+        return WebUrlBuilder::build($this->http->getWebBaseUrl(), 'salesOrder', $id);
+    }
 
     /**
      * Download the order confirmation PDF for the given order.

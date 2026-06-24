@@ -255,6 +255,20 @@ final class HttpClient
     }
 
     /**
+     * Returns the tenant browser (web UI) base URL.
+     *
+     * Exposed so resources can build human-clickable web deep links via
+     * {@see \miralsoft\weclapp\api\Util\WebUrlBuilder} without needing the
+     * WeclappConfig directly.
+     *
+     * @example "https://miralsoft.weclapp.com/"
+     */
+    public function getWebBaseUrl(): string
+    {
+        return $this->config->getWebBaseUrl();
+    }
+
+    /**
      * Core HTTP request method used by get(), post(), and put().
      *
      * @param string               $method      HTTP method.
